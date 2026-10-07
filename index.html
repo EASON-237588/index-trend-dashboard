@@ -688,8 +688,13 @@ function draw(p){
   for(let i = i0; i <= i1; i++){
     if((i - i0) % every) continue;
     const t = B[i].t, x = X(i), prevT = i > 0 ? B[i-1].t : 0;
-    const label = new Date(t).getDate() !== new Date(prevT).getDate() || (i - i0) === 0 ? tText(t).slice(0, 5) + " " + hm(t) : hm(t);
-    ctx.fillStyle = "#6f7891"; ctx.fillText(label, x, h - 6);
+    // 畫面涵蓋超過兩天時只標日期（縮到最小時一格就是兩個月，標時分看不出是哪天）
+    const label = B[i1].t - B[i0].t > 2*86400000 ? tText(t).slice(0, 5)
+      : new Date(t).getDate() !== new Date(prevT).getDate() || (i - i0) === 0 ? tText(t).slice(0, 5) + " " + hm(t) : hm(t);
+    ctx.fillStyle = "#6f7891";
+    // 最左邊的標籤置中會被切掉一半，改靠左對齊
+    const tw = ctx.measureText(label).width;
+    ctx.fillText(label, Math.max(tw / 2 + 2, x), h - 6);
     ctx.strokeStyle = "#161b27"; ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, padT); ctx.lineTo(Math.round(x) + 0.5, padT + ph); ctx.stroke();
   }
   ctx.textAlign = "left";
