@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.0.1</title>
+<title>指數趨勢儀表板 v1.0.2</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -46,7 +46,7 @@ h1 small{font-size:11px;color:var(--mute);font-weight:400;margin-left:5px}
 .badge.short{background:rgba(76,255,0,.12);color:var(--short)}
 .px{margin-left:auto;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
 .px small{font-size:12px;font-weight:400;margin-left:6px}
-.kv{flex:none;font-size:11px;color:var(--mute);margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+.kv{flex:none;font-size:6.6px;color:var(--mute);margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   font-variant-numeric:tabular-nums}
 .kv b{font-weight:400;color:var(--text)}
 .up{color:var(--long)}.dn{color:var(--short)}
@@ -100,7 +100,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.0.1";
+const VERSION = "v1.0.2";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -284,13 +284,13 @@ function calcDon(B, P){
 
 /* ============ 面板設定（參數讀自 TradingView 版面 JuwDqkR0，2026-10-07） ============ */
 const PANELS = [
-  {k:"rf", title:"那斯達克", tf:"30 秒", sym:"QQQUSDT", nq:true, kind:"rf", span:2400,
+  {k:"rf", title:"那斯達克", tf:"短趨勢", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
    sub:"Range Filter 取樣 200・倍數 23・多空反轉（線色＝濾網方向）",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
-  {k:"nq6", title:"那斯達克", tf:"6 分", sym:"QQQUSDT", nq:true, kind:"don", tfMin:6, span:500, flatCol:"#4cff00",
+  {k:"nq6", title:"那斯達克", tf:"中長趨勢", sym:"QQQUSDT", nq:true, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00",
    sub:"Donchian 回看 350 小時（3,500 根）・只做多・停損 8 ATR",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:6}},
-  {k:"gold8", title:"黃金", tf:"8 分", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:500,
+  {k:"gold8", title:"黃金", tf:"8 分", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9,
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
    P:{lookH:350, mode:"both", stopAtr:8, atrLen:14, tfMin:8}},
 ];
@@ -303,7 +303,7 @@ const fx = (p, v) => (p.nq && RATIO) ? v * RATIO : v;
 function fmtP(p, v){
   if(v == null || !isFinite(v)) return "—";
   const x = fx(p, v);
-  return x.toLocaleString("en-US", {minimumFractionDigits: x >= 10000 ? 1 : 2, maximumFractionDigits: x >= 10000 ? 1 : 2});
+  return x.toLocaleString("en-US", {maximumFractionDigits: 0});   // v1.0.2 起一律不顯示小數
 }
 
 /* ============ 狀態列 ============ */
@@ -600,7 +600,7 @@ function renderInfo(p){
   let pnl = "—", pnlCls = "";
   if(e.side && e.price){
     const r = (last.c / e.price - 1) * 100 * e.side;
-    pnl = (r >= 0 ? "+" : "") + r.toFixed(2) + "%"; pnlCls = r >= 0 ? "up" : "dn";
+    pnl = (r >= 0 ? "+" : "") + r.toFixed(0) + "%"; pnlCls = r >= 0 ? "up" : "dn";
   }
   // 下一個會讓部位改變的價位
   let trig = "—", trigK = "觸發線";
@@ -674,7 +674,7 @@ function draw(p){
 
   // 水平格線與價格刻度（刻度用換算後的價格挑整數）
   const k = p.nq && RATIO ? RATIO : 1;
-  const step = niceStep((hi - lo) * k, 5) / k;
+  const step = Math.max(1, niceStep((hi - lo) * k, 5)) / k;   // 刻度不顯示小數，間距至少 1
   ctx.font = "11px system-ui,sans-serif"; ctx.textBaseline = "middle";
   for(let v = Math.ceil(lo / step) * step; v <= hi; v += step){
     const y = Math.round(Y(v)) + 0.5;
