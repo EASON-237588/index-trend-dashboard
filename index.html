@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>指數趨勢儀表板 v1.0.0</title>
+<meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
+<meta name="theme-color" content="#0b0e14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="指數趨勢">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0e14'/%3E%3Cpath d='M8 46 L22 34 L32 40 L46 20 L56 26' fill='none' stroke='%23ff3b3b' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0b0e14; --panel:#131722; --line:#232838; --text:#d6dbe6; --mute:#8b93a7; --dim:#5d6578;
+  --long:#ff3b3b; --short:#4cff00; --flat:#7a8494; --tag:#22c7e8; --warn:#ffb020;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;-webkit-text-size-adjust:100%}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:12px 16px 8px}
+h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.5px}
+h1 small{font-size:12px;color:var(--mute);font-weight:400;margin-left:6px}
+.status{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--mute);flex-wrap:wrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);display:inline-block}
+.dot.live{background:#2ecc71}.dot.warn{background:var(--warn)}.dot.err{background:var(--long)}
+.loadbar{margin:0 16px 8px;height:26px;border-radius:6px;background:var(--panel);border:1px solid var(--line);
+  position:relative;overflow:hidden;font-size:12px}
+.loadbar[hidden]{display:none}
+.loadbar .fill{position:absolute;inset:0 auto 0 0;width:0;background:#1d3557;transition:width .3s}
+.loadbar span{position:relative;line-height:24px;padding:0 10px;color:#cfe3ff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px 8px;min-width:0}
+.panel.wide{grid-column:1 / -1}
+.ph{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.ph b{font-size:16px}
+.tag{font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+.badge{font-size:13px;font-weight:700;border-radius:5px;padding:2px 10px;background:#2a2f3d;color:var(--mute)}
+.badge.long{background:rgba(255,59,59,.16);color:var(--long)}
+.badge.short{background:rgba(76,255,0,.12);color:var(--short)}
+.ps{font-size:12px;color:var(--dim);margin-top:3px}
+.kv{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px 10px;margin:8px 0 6px;font-size:12px}
+.kv div{min-width:0}
+.kv .k{color:var(--dim);display:block}
+.kv .v{font-size:14px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.up{color:var(--long)}.dn{color:var(--short)}
+.cw{position:relative;height:320px;border-radius:6px;overflow:hidden;background:#0e121b}
+.wide .cw{height:400px}
+canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
+.zoom{position:absolute;left:8px;top:8px;display:flex;gap:4px}
+.zoom button{width:30px;height:28px;border-radius:6px;border:1px solid var(--line);background:rgba(19,23,34,.85);
+  color:var(--text);font-size:15px;cursor:pointer;padding:0}
+.tip{position:absolute;left:112px;top:8px;font-size:12px;color:var(--text);background:rgba(11,14,20,.85);
+  border:1px solid var(--line);border-radius:6px;padding:3px 8px;pointer-events:none;white-space:nowrap}
+.tip:empty{display:none}
+.wait{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+  font-size:13px;color:var(--mute);background:#0e121b;padding:16px}
+.wait[hidden]{display:none}
+.sigs{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mute);margin-top:6px;min-height:16px}
+.sigs span{white-space:nowrap;font-variant-numeric:tabular-nums}
+details.notes{margin:12px 16px 24px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px;
+  font-size:13px;line-height:1.7;color:var(--mute)}
+details.notes summary{cursor:pointer;color:var(--text)}
+details.notes li{margin:4px 0}
+@media (max-width:820px){
+  .grid{grid-template-columns:1fr}
+  .cw,.wide .cw{height:300px}
+  .kv{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>指數趨勢儀表板<small id="ver"></small></h1>
+  <div class="status">
+    <span><i class="dot" id="dot"></i> <span id="stTxt">準備中</span></span>
+    <span id="ratioTxt"></span>
+  </div>
+</header>
+<div class="loadbar" id="loadBar" hidden><div class="fill" id="loadFill"></div><span id="loadTxt"></span></div>
+<main class="grid" id="grid"></main>
+
+<details class="notes">
+  <summary>資料來源與限制（第一次用請看）</summary>
+  <ul>
+    <li><b>那斯達克兩格</b>的訊號是用 Binance 的 QQQ 永續合約算的。NQ 期貨沒有免費的即時來源（Yahoo 延遲 10 分鐘），只能用追蹤同一個指數的合約代替。突破與通道類訊號跟價格尺度無關，但成交量與夜盤走勢不會跟 NQ 完全一樣。</li>
+    <li>畫面上的價格依 Hyperliquid 的那斯達克 100 合約即時換算成指數點數，跟 NQ 期貨大約差 0.9%（期貨含持有成本），換算不到時會改顯示 QQQ 原價並在上方標明。</li>
+    <li><b>黃金</b>用 Binance 的黃金永續合約，價位跟 TradingView 的 GOLD 會有幾塊錢的差距。</li>
+    <li>已剔除美國期貨休市時段（美東週五 17:00 到週日 18:00、每天 17:00 到 18:00），K 棒從美東 18:00 開盤起算，跟 TradingView 的 NQ 與 GOLD 切法一致。</li>
+    <li><b>Range Filter</b> 依 TradingView「Optimized Range Filter for Gold」原始碼逐行移植，參數照你圖上的設定：取樣 200、倍數 23、來源高低價平均、ATR 與量過濾都開、止損止盈與移動止損都關。原碼的 ATR 過濾條件恆成立、實際不會擋訊號；量過濾是「當根量大於 20 根均量的 0.8 倍」。第一個訊號不進場，要等方向真的轉過一次。</li>
+    <li><b>Donchian</b> 依「11分 Donchian 反轉・逆勢分批 v1.3.0」移植：回看 350 小時（6 分＝3,500 根、8 分＝2,625 根）、1 段。那斯達克是只做多（跌破三分之一回看的低點或虧損達 8 倍 ATR 就出場），黃金是多空反轉、永遠在場。</li>
+    <li>訊號只用<b>已收盤</b>的 K 棒，跟 TradingView 策略一致；正在形成的那根只畫價格。紅線＝持多、綠線＝持空、灰線＝空手。</li>
+    <li>30 秒線第一次開啟要從逐筆成交合成約 3,200 根（前 1,200 根是暖機），大約一分多鐘；之後會存在這台瀏覽器，重開只補缺的部分。</li>
+    <li><b>跟 TradingView 對帳的結果（2026-10-07）</b>：黃金 8 分最近一次翻空時間完全相同（9/02 09:44）。那斯達克 6 分的進場晚 3 天（TradingView 9/18、這裡 9/21），推測是 NQ 回溯調整連續合約在 9 月換月時平移了舊價格，QQQ 合約沒有換月。30 秒線在美國與歐洲時段的翻轉與 TradingView 只差約 2 分鐘，但<b>台灣白天（美東半夜）QQQ 合約成交稀疏，會多出 TradingView 沒有的來回翻轉或提早翻轉</b>，這段時間的 30 秒訊號請打折扣。</li>
+  </ul>
+</details>
+
+<script>
+"use strict";
+const VERSION = "v1.0.0";
+const $ = id => document.getElementById(id);
+const FAPI = "https://fapi.binance.com/fapi/v1";
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const p2 = n => String(n).padStart(2, "0");
+function tText(ms){ const d = new Date(ms); return `${p2(d.getMonth()+1)}/${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`; }
+function hm(ms){ const d = new Date(ms); return `${p2(d.getHours())}:${p2(d.getMinutes())}`; }
+function durText(ms){
+  const m = Math.max(0, Math.floor(ms/60000));
+  if(m < 60) return `${m} 分`;
+  const h = Math.floor(m/60);
+  if(h < 48) return `${h} 時 ${m%60} 分`;
+  return `${Math.floor(h/24)} 天 ${h%24} 時`;
+}
+
+/* ============ 美國期貨交易時段 ============
+   NQ 與 TVC:GOLD 都是美東週日 18:00 開盤、週五 17:00 收盤，每天 17:00～18:00 休息。
+   Binance 合約 24/7 交易，不剔除的話週末會冒出 TradingView 上不存在的 K 棒與翻轉。
+   美東與 UTC 的差是整小時（含夏令時間），所以用小時當快取鍵就夠。 */
+const ETF = new Intl.DateTimeFormat("en-US", {timeZone:"America/New_York", weekday:"short", hour:"2-digit", hourCycle:"h23"});
+const ETC = new Map();
+function et(t){
+  const key = Math.floor(t/3600000);
+  let v = ETC.get(key);
+  if(!v){
+    const ps = ETF.formatToParts(new Date(key*3600000));
+    v = {wd: ps.find(x => x.type === "weekday").value, h: +ps.find(x => x.type === "hour").value % 24};
+    ETC.set(key, v);
+  }
+  return v;
+}
+function cmeOpen(t){
+  const {wd, h} = et(t);
+  if(wd === "Sat") return false;
+  if(wd === "Sun") return h >= 18;
+  if(wd === "Fri") return h < 17;
+  return h !== 17;
+}
+/* K 棒起點從美東 18:00 開盤起算（TradingView 的切法）。6 分剛好整除 60，跟整點對齊沒差；
+   8 分不整除，用整點對齊會整根錯位。 */
+function sessBucket(t, tf){
+  const h = et(t).h, m = new Date(t).getUTCMinutes();
+  const mins = ((h - 18 + 24) % 24) * 60 + m;
+  return t - (mins % tf) * 60000;
+}
+
+/* ============ Pine 等價函式 ============ */
+// ta.ema 與 ta.rma：前 len 個有效值用簡單平均當種子（Pine 原始定義）
+function pineMA(src, len, alpha){
+  const out = new Array(src.length).fill(null);
+  let prev = null, sum = 0, cnt = 0;
+  for(let i = 0; i < src.length; i++){
+    const v = src[i];
+    if(v == null){ out[i] = prev; continue; }
+    if(prev === null){
+      sum += v; cnt++;
+      if(cnt === len){ prev = sum/len; out[i] = prev; }
+    }else{
+      prev = alpha*v + (1-alpha)*prev;
+      out[i] = prev;
+    }
+  }
+  return out;
+}
+const pineEma = (s, n) => pineMA(s, n, 2/(n+1));
+const pineRma = (s, n) => pineMA(s, n, 1/n);
+function pineSma(src, len){
+  const out = new Array(src.length).fill(null); let s = 0;
+  for(let i = 0; i < src.length; i++){
+    s += src[i];
+    if(i >= len) s -= src[i-len];
+    if(i >= len-1) out[i] = s/len;
+  }
+  return out;
+}
+function trueRange(B){
+  return B.map((b, i) => i === 0 ? b.h - b.l
+    : Math.max(b.h - b.l, Math.abs(b.h - B[i-1].c), Math.abs(b.l - B[i-1].c)));
+}
+// 滑動極值，不含當根（= ta.highest(x,n)[1]），單調佇列 O(n)
+function rollMax(x, n){
+  const out = new Array(x.length).fill(null), dq = [];
+  for(let i = 0; i < x.length; i++){
+    if(i >= n) out[i] = x[dq[0]];
+    while(dq.length && x[dq[dq.length-1]] <= x[i]) dq.pop();
+    dq.push(i);
+    if(dq[0] <= i - n) dq.shift();
+  }
+  return out;
+}
+function rollMin(x, n){
+  const out = new Array(x.length).fill(null), dq = [];
+  for(let i = 0; i < x.length; i++){
+    if(i >= n) out[i] = x[dq[0]];
+    while(dq.length && x[dq[dq.length-1]] >= x[i]) dq.pop();
+    dq.push(i);
+    if(dq[0] <= i - n) dq.shift();
+  }
+  return out;
+}
+
+/* ============ Range Filter：照「Optimized Range Filter for Gold」原始碼逐行移植 ============ */
+function calcRF(B, P){
+  const n = B.length;
+  const src = B.map(b => (b.h + b.l) / 2);
+  const diff = src.map((v, i) => i === 0 ? null : Math.abs(v - src[i-1]));
+  const avrng = pineEma(diff, P.per);
+  const smrng = pineEma(avrng, P.per*2 - 1).map(v => v == null ? null : v * P.mult);
+
+  // rngfilt：前一根是 na 時 nz() 當成 0
+  const filt = new Array(n).fill(null);
+  let prev = null;
+  for(let i = 0; i < n; i++){
+    const x = src[i], r = smrng[i];
+    if(r == null){ prev = null; continue; }
+    const pv = prev == null ? 0 : prev;
+    filt[i] = prev = x > pv ? (x - r < pv ? pv : x - r) : (x + r > pv ? pv : x + r);
+  }
+
+  const atr = pineRma(trueRange(B), P.atrLen);
+  const volMa = pineSma(B.map(b => b.v || 0), P.volLen);
+  const fcol = new Array(n).fill(0), pos = new Array(n).fill(0), sigs = [];
+  let up = 0, dn = 0, ci = null, cur = 0;
+  for(let i = 0; i < n; i++){
+    const f = filt[i], pf = i ? filt[i-1] : null;
+    if(f != null && pf != null){
+      up = f > pf ? up + 1 : f < pf ? 0 : up;
+      dn = f < pf ? dn + 1 : f > pf ? 0 : dn;
+    }
+    fcol[i] = up > 0 ? 1 : dn > 0 ? -1 : 0;
+    const s = src[i], ps = i ? src[i-1] : null, moved = ps != null && s !== ps;
+    const longCond  = f != null && s > f && moved && up > 0;
+    const shortCond = f != null && s < f && moved && dn > 0;
+    // 原碼：close > close - atr*mult。ATR 有值且大於 0 時恆成立，所以實際不擋訊號
+    const c = B[i].c, a = atr[i];
+    const longF  = !P.useAtr || (a != null && c > c - a * P.atrMult);
+    const shortF = !P.useAtr || (a != null && c < c + a * P.atrMult);
+    const volOK  = !P.useVol || (volMa[i] != null && (B[i].v || 0) > volMa[i] * 0.8);
+    const longSig = longCond && longF && volOK, shortSig = shortCond && shortF && volOK;
+    const pci = ci;
+    ci = longSig ? 1 : shortSig ? -1 : pci;
+    if(longSig && pci === -1){ cur = 1; sigs.push({i, d:1}); }
+    else if(shortSig && pci === 1){ cur = -1; sigs.push({i, d:-1}); }
+    pos[i] = cur;
+  }
+  const warm = 6 * P.per;   // 內層 EMA 收斂前通道偏窄，這段的訊號不列出
+  return {pos, filt, fcol, all: sigs, sigs: sigs.filter(s => s.i >= warm), warm};
+}
+
+/* ============ Donchian：照「11分 Donchian 反轉 · 逆勢分批 v1.3.0」逐行移植（1 段） ============ */
+function calcDon(B, P){
+  const n = B.length;
+  const look = Math.min(4999, Math.max(2, Math.round(P.lookH * 60 / P.tfMin)));
+  const exitN = Math.max(10, Math.round(look / 3));
+  const H = B.map(b => b.h), L = B.map(b => b.l);
+  const hh = rollMax(H, look), ll = rollMin(L, look), he = rollMax(H, exitN), le = rollMin(L, exitN);
+  const atr = pineRma(trueRange(B), P.atrLen);
+  const rev = P.mode === "both";
+  const pos = new Array(n).fill(0), avgA = new Array(n).fill(null), sigs = [];
+  let dir = 0, side = 0, avg = null;
+  for(let i = 0; i < n; i++){
+    const c = B[i].c;
+    if(hh[i] != null && c > hh[i] && P.mode !== "short") dir = 1;
+    else if(ll[i] != null && c < ll[i] && P.mode !== "long") dir = -1;
+    else if(!rev && dir === 1 && le[i] != null && c < le[i]) dir = 0;
+    else if(!rev && dir === -1 && he[i] != null && c > he[i]) dir = 0;
+    const flip = dir !== 0 && dir !== side;
+    // 硬停損只在三態模式；停損後 dir 歸零，要等下一次突破才重進
+    if(!rev && side !== 0 && atr[i] != null && atr[i] > 0 && (avg - c) * side >= P.stopAtr * atr[i]){
+      sigs.push({i, d:0, why:"停損"});
+      side = 0; avg = null; dir = 0;
+    }
+    if(!rev && dir === 0 && side !== 0){
+      sigs.push({i, d:0, why:"出場"});
+      side = 0; avg = null;
+    }
+    if(flip){ side = dir; avg = c; sigs.push({i, d:dir}); }
+    pos[i] = side; avgA[i] = avg;
+  }
+  return {pos, avg:avgA, atr, look, exitN, hh, ll, all: sigs, sigs: sigs.filter(s => s.i >= look), warm: look};
+}
+
+/* ============ 面板設定（參數讀自 TradingView 版面 JuwDqkR0，2026-10-07） ============ */
+const PANELS = [
+  {k:"rf", title:"那斯達克", tf:"30 秒", sym:"QQQUSDT", nq:true, kind:"rf", wide:true, span:720,
+   sub:"Range Filter 取樣 200・倍數 23・多空反轉（線色＝濾網方向）",
+   P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  {k:"nq6", title:"那斯達克", tf:"6 分", sym:"QQQUSDT", nq:true, kind:"don", tfMin:6, span:480,
+   sub:"Donchian 回看 350 小時（3,500 根）・只做多・停損 8 ATR",
+   P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:6}},
+  {k:"gold8", title:"黃金", tf:"8 分", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:360,
+   sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
+   P:{lookH:350, mode:"both", stopAtr:8, atrLen:14, tfMin:8}},
+];
+for(const p of PANELS){ p.bars = []; p.done = 0; p.R = null; p.view = {span:p.span, off:0}; p.hover = null; p.dirty = false; p.ready = false; }
+const PAN = k => PANELS.find(p => p.k === k);
+
+// 訊號與狀態列的價格：那斯達克換算成指數點數
+let RATIO = null;
+const fx = (p, v) => (p.nq && RATIO) ? v * RATIO : v;
+function fmtP(p, v){
+  if(v == null || !isFinite(v)) return "—";
+  const x = fx(p, v);
+  return x.toLocaleString("en-US", {minimumFractionDigits: x >= 10000 ? 1 : 2, maximumFractionDigits: x >= 10000 ? 1 : 2});
+}
+
+/* ============ 狀態列 ============ */
+function setStatus(cls, txt){ $("dot").className = "dot " + cls; $("stTxt").textContent = txt; }
+const LOAD = {};
+function setLoad(key, frac, txt){
+  if(frac == null) delete LOAD[key]; else LOAD[key] = {frac, txt};
+  const ks = Object.keys(LOAD);
+  $("loadBar").hidden = !ks.length;
+  if(!ks.length) return;
+  const f = ks.reduce((s, k) => s + Math.min(1, LOAD[k].frac), 0) / ks.length;
+  $("loadFill").style.width = (f*100).toFixed(1) + "%";
+  $("loadTxt").textContent = ks.map(k => LOAD[k].txt).join("　");
+}
+
+/* ============ 抓資料 ============ */
+async function jget(url, opt){
+  for(let tries = 0; ; tries++){
+    const c = new AbortController(), t = setTimeout(() => c.abort(), 20000);
+    try{
+      const r = await fetch(url, Object.assign({cache:"no-store", signal:c.signal}, opt || {}));
+      if(r.status === 429 || r.status === 418){
+        setStatus("warn", "Binance 請求太頻繁，暫停 60 秒後繼續");
+        await sleep(60000); continue;
+      }
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      return await r.json();
+    }catch(e){
+      if(tries >= 2) throw e;
+      await sleep(1500 * (tries + 1));
+    }finally{ clearTimeout(t); }
+  }
+}
+const kl = k => ({t:+k[0], o:+k[1], h:+k[2], l:+k[3], c:+k[4], v:+k[5]});
+
+// 往回抓 1 分 K，直到交易時段內的分鐘數夠用
+const RAW1M = {};
+async function loadKlines(sym, needMin, label){
+  const rev = []; let end = null, sess = 0;
+  for(let guard = 0; sess < needMin && guard < 120; guard++){
+    const raw = await jget(`${FAPI}/klines?symbol=${sym}&interval=1m&limit=1500` + (end ? `&endTime=${end}` : ""));
+    if(!Array.isArray(raw) || !raw.length) break;
+    const ch = raw.map(kl);
+    for(let i = ch.length - 1; i >= 0; i--){ rev.push(ch[i]); if(cmeOpen(ch[i].t)) sess++; }
+    end = ch[0].t - 1;
+    setLoad(sym, sess/needMin, `${label} ${Math.min(100, Math.round(sess/needMin*100))}%`);
+    if(ch.length < 1500) break;
+  }
+  setLoad(sym, null);
+  RAW1M[sym] = rev.reverse();
+}
+function mergeKline(sym, b){
+  const a = RAW1M[sym]; if(!a) return;
+  const last = a[a.length-1];
+  if(!last || b.t > last.t) a.push(b);
+  else if(b.t === last.t) a[a.length-1] = b;
+  else{
+    for(let i = a.length - 1; i >= 0 && a[i].t >= b.t; i--) if(a[i].t === b.t){ a[i] = b; break; }
+  }
+}
+function aggSession(raw, tf){
+  const out = []; let cur = null;
+  for(const b of raw){
+    if(!cmeOpen(b.t)) continue;
+    const st = sessBucket(b.t, tf);
+    if(!cur || cur.t !== st){
+      if(cur) out.push(cur);
+      cur = {t:st, o:b.o, h:b.h, l:b.l, c:b.c, v:b.v, end:st + tf*60000};
+    }else{
+      if(b.h > cur.h) cur.h = b.h;
+      if(b.l < cur.l) cur.l = b.l;
+      cur.c = b.c; cur.v += b.v;
+    }
+  }
+  if(cur) out.push(cur);
+  return out;
+}
+
+/* 30 秒線：由逐筆成交合成。Binance 合約沒有秒級 K 線。
+   成交編號是連續整數，所以往回抓就是把 fromId 一次往前推 1000。 */
+const S30 = {bars:[], lastId:null, ready:false, pending:[]};
+const NEED30 = 3200, CACHE30 = "itd-30s-v1";
+function addTrade(tr){
+  if(S30.lastId != null && tr.a <= S30.lastId) return;
+  S30.lastId = tr.a;
+  if(!cmeOpen(tr.T)) return;
+  const t = Math.floor(tr.T / 30000) * 30000, p = +tr.p, q = +tr.q, B = S30.bars;
+  const last = B[B.length-1];
+  if(!last || t > last.t){
+    // 交易時段內沒有成交的 30 秒補一根平盤（NQ 本身幾乎每 30 秒都有成交）
+    if(last && t - last.t <= 2*3600000){
+      for(let x = last.t + 30000; x < t; x += 30000)
+        if(cmeOpen(x)) B.push({t:x, o:last.c, h:last.c, l:last.c, c:last.c, v:0});
+    }
+    B.push({t, o:p, h:p, l:p, c:p, v:q});
+  }else if(t === last.t){
+    if(p > last.h) last.h = p;
+    if(p < last.l) last.l = p;
+    last.c = p; last.v += q;
+  }
+}
+function save30(){
+  try{
+    const done = S30.bars.filter(b => b.t + 30000 <= Date.now()).slice(-NEED30 - 400);
+    localStorage.setItem(CACHE30, JSON.stringify({lastId:S30.lastId, bars:done.map(b => [b.t, b.o, b.h, b.l, b.c, b.v])}));
+  }catch(e){}
+}
+async function latestAggId(sym){
+  const a = await jget(`${FAPI}/aggTrades?symbol=${sym}&limit=1`);
+  return a[a.length-1].a;
+}
+async function forwardTrades(sym, toId, onProg){
+  const from0 = S30.lastId;
+  while(S30.lastId < toId){
+    const ch = await jget(`${FAPI}/aggTrades?symbol=${sym}&fromId=${S30.lastId + 1}&limit=1000`);
+    if(!ch.length) break;
+    for(const tr of ch) addTrade(tr);
+    if(onProg) onProg((S30.lastId - from0) / Math.max(1, toId - from0));
+    if(ch.length < 1000) break;
+    await sleep(800);
+  }
+}
+async function load30(sym){
+  const label = "那斯達克 30 秒";
+  const latest = await latestAggId(sym);
+  let cache = null;
+  try{ cache = JSON.parse(localStorage.getItem(CACHE30) || "null"); }catch(e){}
+  if(cache && cache.bars && cache.bars.length > NEED30 * 0.8 && latest - cache.lastId <= 60000){
+    S30.bars = cache.bars.map(a => ({t:a[0], o:a[1], h:a[2], l:a[3], c:a[4], v:a[5]}));
+    S30.lastId = cache.lastId;
+    await forwardTrades(sym, latest, f => setLoad("t30", f, `${label} 補上次之後的成交 ${Math.round(f*100)}%`));
+  }else{
+    // 往回抓到交易時段內湊滿 NEED30 根為止；最多回溯 5 天
+    const chunks = [], buckets = new Set();
+    let from = latest - 999;
+    for(let guard = 0; guard < 160 && from >= 0; guard++){
+      const ch = await jget(`${FAPI}/aggTrades?symbol=${sym}&fromId=${from}&limit=1000`);
+      if(!ch.length) break;
+      chunks.push(ch);
+      for(const tr of ch) if(cmeOpen(tr.T)) buckets.add(Math.floor(tr.T/30000));
+      const f = buckets.size / NEED30;
+      setLoad("t30", f, `${label} 合成中 ${Math.min(100, Math.round(f*100))}%（逐筆成交 ${(chunks.length*1000).toLocaleString()} 筆）`);
+      if(buckets.size >= NEED30 * 1.05 || ch[0].T < Date.now() - 5*86400000) break;
+      from -= 1000;
+      await sleep(800);   // aggTrades 每次權重 20，壓在每分鐘上限 2,400 以內
+    }
+    S30.bars = []; S30.lastId = null;
+    for(let c = chunks.length - 1; c >= 0; c--) for(const tr of chunks[c]) addTrade(tr);
+    await forwardTrades(sym, latest);
+  }
+  if(S30.bars.length > NEED30 + 600) S30.bars = S30.bars.slice(-(NEED30 + 600));
+  for(const tr of S30.pending) addTrade(tr);
+  S30.pending = [];
+  S30.ready = true;
+  setLoad("t30", null);
+  save30();
+}
+
+/* 那斯達克換算比例：Hyperliquid 那斯達克 100 合約 ÷ QQQ 合約 */
+async function updateRatio(){
+  try{
+    const j = await jget("https://api.hyperliquid.xyz/info",
+      {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type:"allMids", dex:"xyz"})});
+    const ndx = +j["xyz:XYZ100"];
+    const q = RAW1M.QQQUSDT && RAW1M.QQQUSDT.length ? RAW1M.QQQUSDT[RAW1M.QQQUSDT.length-1].c : null;
+    if(ndx > 0 && q > 0){
+      RATIO = ndx / q;
+      $("ratioTxt").textContent = `那斯達克價格＝QQQ 合約 × ${RATIO.toFixed(3)}（依那斯達克 100 即時換算）`;
+      for(const p of PANELS) if(p.nq) p.dirty = true;
+    }
+  }catch(e){
+    if(!RATIO) $("ratioTxt").textContent = "換算失敗，那斯達克兩格暫時顯示 QQQ 合約原價";
+  }
+}
+
+/* ============ 即時推送 ============ */
+let WS = null, wsBackoff = 1000, lastMsg = 0;
+function connectWS(){
+  const streams = ["qqqusdt@aggTrade", "qqqusdt@kline_1m", "xauusdt@kline_1m"].join("/");
+  try{ WS = new WebSocket(`wss://fstream.binance.com/stream?streams=${streams}`); }
+  catch(e){ setTimeout(connectWS, 5000); return; }
+  WS.onopen = () => { wsBackoff = 1000; setStatus("live", "即時連線中"); backfill(); };
+  WS.onmessage = ev => {
+    lastMsg = Date.now();
+    const m = JSON.parse(ev.data), d = m.data;
+    if(!d) return;
+    if(d.e === "aggTrade"){
+      const tr = {a:d.a, p:d.p, q:d.q, T:d.T};
+      if(!S30.ready){ S30.pending.push(tr); return; }
+      if(S30.lastId != null && tr.a > S30.lastId + 1) gapFill(tr.a - 1);
+      addTrade(tr); PAN("rf").dirty = true;
+    }else if(d.e === "kline"){
+      const k = d.k, sym = d.s;
+      mergeKline(sym, {t:k.t, o:+k.o, h:+k.h, l:+k.l, c:+k.c, v:+k.v});
+      for(const p of PANELS) if(p.kind === "don" && p.sym === sym) p.dirty = true;
+    }
+  };
+  WS.onclose = () => {
+    setStatus("warn", "即時連線中斷，重新連線中");
+    setTimeout(connectWS, wsBackoff);
+    wsBackoff = Math.min(30000, wsBackoff * 2);
+  };
+  WS.onerror = () => { try{ WS.close(); }catch(e){} };
+}
+let gapBusy = false;
+async function gapFill(toId){
+  if(gapBusy) return; gapBusy = true;
+  try{ await forwardTrades("QQQUSDT", toId); }catch(e){} finally{ gapBusy = false; }
+}
+// 重新連線後補回斷線期間的 1 分 K 與逐筆成交
+async function backfill(){
+  for(const sym of ["QQQUSDT", "XAUUSDT"]){
+    const a = RAW1M[sym]; if(!a || !a.length) continue;
+    try{
+      const raw = await jget(`${FAPI}/klines?symbol=${sym}&interval=1m&limit=1500&startTime=${a[a.length-1].t}`);
+      for(const k of raw) mergeKline(sym, kl(k));
+      for(const p of PANELS) if(p.sym === sym) p.dirty = true;
+    }catch(e){}
+  }
+  if(S30.ready){ try{ await gapFill(await latestAggId("QQQUSDT")); }catch(e){} }
+}
+
+/* ============ 計算 ============ */
+function recompute(p){
+  let B;
+  if(p.kind === "rf"){
+    if(!S30.ready) return;
+    B = S30.bars;
+    const now = Date.now();
+    p.done = B.length && B[B.length-1].t + 30000 > now ? B.length - 1 : B.length;
+  }else{
+    const raw = RAW1M[p.sym]; if(!raw) return;
+    B = aggSession(raw, p.tfMin);
+    const now = Date.now();
+    p.done = B.length && B[B.length-1].end > now ? B.length - 1 : B.length;
+  }
+  p.bars = B;
+  const done = B.slice(0, p.done);
+  p.R = p.kind === "rf" ? calcRF(done, p.P) : calcDon(done, p.P);
+  p.ready = true;
+  $("wait-" + p.k).hidden = true;
+}
+
+/* ============ 畫面 ============ */
+function buildDOM(){
+  $("ver").textContent = VERSION;
+  $("grid").innerHTML = PANELS.map(p => `
+  <section class="panel${p.wide ? " wide" : ""}" id="p-${p.k}">
+    <div class="ph"><b>${p.title}</b><span class="tag">${p.tf}</span><span class="badge" id="dir-${p.k}">—</span></div>
+    <div class="ps">${p.sub}</div>
+    <div class="kv" id="kv-${p.k}"></div>
+    <div class="cw">
+      <canvas id="cv-${p.k}"></canvas>
+      <div class="zoom">
+        <button data-k="${p.k}" data-z="in" title="放大">＋</button>
+        <button data-k="${p.k}" data-z="out" title="縮小">－</button>
+        <button data-k="${p.k}" data-z="reset" title="回到最新">⟲</button>
+      </div>
+      <div class="tip" id="tip-${p.k}"></div>
+      <div class="wait" id="wait-${p.k}">載入中…</div>
+    </div>
+    <div class="sigs" id="sigs-${p.k}"></div>
+  </section>`).join("");
+  for(const p of PANELS) bindChart(p);
+  document.querySelectorAll(".zoom button").forEach(b => b.onclick = () => {
+    const p = PAN(b.dataset.k), z = b.dataset.z;
+    if(z === "reset") p.view = {span:p.span, off:0};
+    else zoomAt(p, z === "in" ? 0.7 : 1/0.7, 1);
+    draw(p);
+  });
+}
+
+function entryOf(p){
+  const R = p.R; if(!R || !p.done) return null;
+  const side = R.pos[p.done - 1];
+  if(!side) return {side:0};
+  // 用全部訊號找：目前的部位可能是暖機區內建立的，訊號清單不列，但進場價要算得出來
+  for(let k = R.all.length - 1; k >= 0; k--){
+    const s = R.all[k];
+    if(s.d === side) return {side, i:s.i, t:p.bars[s.i].t, price:p.bars[s.i].c};
+  }
+  return {side};
+}
+
+function renderInfo(p){
+  if(!p.ready) return;
+  const R = p.R, B = p.bars, last = B[B.length-1];
+  const e = entryOf(p) || {side:0};
+  const badge = $("dir-" + p.k);
+  badge.className = "badge " + (e.side > 0 ? "long" : e.side < 0 ? "short" : "");
+  badge.textContent = e.side > 0 ? "持多" : e.side < 0 ? "持空" : "空手";
+
+  let pnl = "—", pnlCls = "";
+  if(e.side && e.price){
+    const r = (last.c / e.price - 1) * 100 * e.side;
+    pnl = (r >= 0 ? "+" : "") + r.toFixed(2) + "%"; pnlCls = r >= 0 ? "up" : "dn";
+  }
+  // 下一個會讓部位改變的價位
+  let trig = "—", trigK = "觸發線";
+  const done = B.slice(0, p.done);
+  if(p.kind === "rf"){
+    trigK = "濾網線"; trig = fmtP(p, R.filt[p.done - 1]);
+  }else{
+    const look = R.look, exitN = R.exitN, n = done.length;
+    const hi = (m) => Math.max(...done.slice(n - m).map(b => b.h));
+    const lo = (m) => Math.min(...done.slice(n - m).map(b => b.l));
+    if(p.P.mode === "both"){
+      if(e.side > 0){ trigK = "翻空線（跌破）"; trig = fmtP(p, lo(look)); }
+      else if(e.side < 0){ trigK = "翻多線（突破）"; trig = fmtP(p, hi(look)); }
+      else { trigK = "突破／跌破"; trig = fmtP(p, hi(look)) + "／" + fmtP(p, lo(look)); }
+    }else if(e.side > 0){
+      const a = R.atr[n - 1], stop = R.avg[n - 1] - p.P.stopAtr * a;
+      const out = Math.max(lo(exitN), stop);
+      trigK = out === stop ? "停損線（跌破）" : "出場線（跌破）"; trig = fmtP(p, out);
+    }else{
+      trigK = "進場線（突破）"; trig = fmtP(p, hi(look));
+    }
+  }
+  const items = [
+    ["現價", fmtP(p, last.c), ""],
+    ["進場價", e.price ? fmtP(p, e.price) : "—", ""],
+    ["進場後", pnl, pnlCls],
+    ["持有", e.t ? durText(Date.now() - e.t) : "—", ""],
+    [trigK, trig, ""],
+  ];
+  $("kv-" + p.k).innerHTML = items.map(([k, v, c]) => `<div><span class="k">${k}</span><span class="v ${c}">${v}</span></div>`).join("");
+
+  const ss = R.sigs.slice(-6).reverse();
+  $("sigs-" + p.k).innerHTML = ss.length ? "最近訊號：" + ss.map(s => {
+    const b = B[s.i], w = s.d > 0 ? `<b class="up">翻多</b>` : s.d < 0 ? `<b class="dn">翻空</b>` : `<b>${s.why}</b>`;
+    return `<span>${tText(b.t)} ${w} ${fmtP(p, b.c)}</span>`;
+  }).join("") : "最近訊號：載入的樣本內還沒有訊號";
+}
+
+function setupCanvas(cv){
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if(cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  const ctx = cv.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {ctx, w, h};
+}
+function niceStep(range, n){
+  const raw = range / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag;
+}
+function viewRange(p){
+  const n = p.bars.length;
+  const span = Math.max(30, Math.min(p.view.span, n));
+  const off = Math.max(0, Math.min(p.view.off, n - span));
+  p.view.span = span; p.view.off = off;
+  const i1 = n - 1 - off;
+  return {i0: Math.max(0, i1 - span + 1), i1, span};
+}
+const COL = {1:"#ff3b3b", "-1":"#4cff00", 0:"#7a8494"};
+
+function draw(p){
+  if(!p.ready || !p.bars.length) return;
+  const cv = $("cv-" + p.k), {ctx, w, h} = setupCanvas(cv);
+  const B = p.bars, R = p.R, {i0, i1, span} = viewRange(p);
+  const padR = 70, padB = 22, padT = 8, pw = w - padR, ph = h - padB - padT;
+  const bw = pw / span, X = i => (i - i0 + 0.5) * bw;
+  const posAt = i => i < p.done ? R.pos[i] : R.pos[p.done - 1] || 0;
+
+  let lo = Infinity, hi = -Infinity;
+  for(let i = i0; i <= i1; i++){
+    const c = B[i].c; if(c < lo) lo = c; if(c > hi) hi = c;
+    if(p.kind === "rf" && i < p.done && R.filt[i] != null){ const f = R.filt[i]; if(f < lo) lo = f; if(f > hi) hi = f; }
+  }
+  if(hi === lo){ hi += 1; lo -= 1; }
+  const padY = (hi - lo) * 0.08; lo -= padY; hi += padY;
+  const Y = v => padT + (hi - v) / (hi - lo) * ph;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#0e121b"; ctx.fillRect(0, 0, w, h);
+
+  // 水平格線與價格刻度（刻度用換算後的價格挑整數）
+  const k = p.nq && RATIO ? RATIO : 1;
+  const step = niceStep((hi - lo) * k, 5) / k;
+  ctx.font = "11px system-ui,sans-serif"; ctx.textBaseline = "middle";
+  for(let v = Math.ceil(lo / step) * step; v <= hi; v += step){
+    const y = Math.round(Y(v)) + 0.5;
+    ctx.strokeStyle = "#1b2130"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(pw, y); ctx.stroke();
+    ctx.fillStyle = "#6f7891"; ctx.fillText(fmtP(p, v), pw + 6, y);
+  }
+  // 時間刻度：每隔至少 90 像素標一次，跨日標日期
+  const every = Math.max(1, Math.ceil(90 / bw));
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "center";
+  for(let i = i0; i <= i1; i++){
+    if((i - i0) % every) continue;
+    const t = B[i].t, x = X(i), prevT = i > 0 ? B[i-1].t : 0;
+    const label = new Date(t).getDate() !== new Date(prevT).getDate() || (i - i0) === 0 ? tText(t).slice(0, 5) + " " + hm(t) : hm(t);
+    ctx.fillStyle = "#6f7891"; ctx.fillText(label, x, h - 6);
+    ctx.strokeStyle = "#161b27"; ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, padT); ctx.lineTo(Math.round(x) + 0.5, padT + ph); ctx.stroke();
+  }
+  ctx.textAlign = "left";
+
+  // 依顏色分段畫線：每一段的顏色取段尾那根的狀態（跟 Pine 的 plot 一樣）
+  function colorLine(val, colAt, width){
+    let run = null;
+    ctx.lineWidth = width; ctx.lineJoin = "round";
+    for(let i = Math.max(i0, 1); i <= i1; i++){
+      const a = val(i - 1), b = val(i);
+      if(a == null || b == null){ if(run){ ctx.stroke(); run = null; } continue; }
+      const c = colAt(i);
+      if(c !== run){
+        if(run !== null) ctx.stroke();
+        ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(X(i - 1), Y(a)); run = c;
+      }
+      ctx.lineTo(X(i), Y(b));
+    }
+    if(run !== null) ctx.stroke();
+  }
+  if(p.kind === "rf"){
+    colorLine(i => B[i].c, () => "rgba(170,178,196,.55)", 1);
+    colorLine(i => i < p.done ? R.filt[i] : (p.done ? R.filt[p.done - 1] : null),
+              i => COL[i < p.done ? R.fcol[i] : R.fcol[p.done - 1]], 2.5);
+  }else{
+    colorLine(i => B[i].c, i => COL[posAt(i)], 2.4);
+  }
+
+  // 訊號三角形：只標進場（翻多紅、翻空綠）
+  for(const s of R.sigs){
+    if(s.i < i0 || s.i > i1 || !s.d) continue;
+    const x = X(s.i), y = Y(B[s.i].c), up = s.d > 0;
+    ctx.fillStyle = COL[s.d];
+    ctx.beginPath();
+    if(up){ ctx.moveTo(x, y + 6); ctx.lineTo(x - 5, y + 15); ctx.lineTo(x + 5, y + 15); }
+    else  { ctx.moveTo(x, y - 6); ctx.lineTo(x - 5, y - 15); ctx.lineTo(x + 5, y - 15); }
+    ctx.fill();
+  }
+
+  // 最新價虛線與標籤
+  const lastC = B[B.length-1].c, ly = Y(lastC);
+  if(p.view.off === 0 || (ly > padT && ly < padT + ph)){
+    ctx.setLineDash([2, 3]); ctx.strokeStyle = "#22c7e8"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(pw, ly); ctx.stroke(); ctx.setLineDash([]);
+    const txt = fmtP(p, lastC);
+    ctx.fillStyle = "#22c7e8"; ctx.fillRect(pw + 1, ly - 9, padR - 2, 18);
+    ctx.fillStyle = "#03121a"; ctx.textBaseline = "middle"; ctx.fillText(txt, pw + 5, ly);
+  }
+
+  // 十字線
+  const tip = $("tip-" + p.k);
+  if(p.hover != null && p.hover >= i0 && p.hover <= i1){
+    const i = p.hover, x = X(i);
+    ctx.strokeStyle = "rgba(200,210,230,.35)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, padT); ctx.lineTo(Math.round(x) + 0.5, padT + ph); ctx.stroke();
+    const ps = posAt(i), st = ps > 0 ? "持多" : ps < 0 ? "持空" : "空手";
+    tip.textContent = `${tText(B[i].t)}　收 ${fmtP(p, B[i].c)}　${st}` + (i >= p.done ? "（形成中）" : "");
+  }else tip.textContent = "";
+}
+
+// 以畫面某個位置為錨點縮放（anchor01：0＝最左、1＝最右）
+function zoomAt(p, f, anchor01){
+  const {i0, span} = viewRange(p), n = p.bars.length;
+  const idx = i0 + anchor01 * span;
+  const ns = Math.max(30, Math.min(n, Math.round(span * f)));
+  const ni0 = idx - anchor01 * ns;
+  p.view.span = ns;
+  p.view.off = Math.max(0, Math.min(n - ns, Math.round(n - (ni0 + ns))));
+}
+function bindChart(p){
+  const cv = $("cv-" + p.k);
+  let drag = null;
+  const idxAt = ex => {
+    const r = cv.getBoundingClientRect(), {i0, span} = viewRange(p);
+    const pw = r.width - 70;
+    return Math.max(0, Math.min(p.bars.length - 1, i0 + Math.floor((ex - r.left) / pw * span)));
+  };
+  cv.addEventListener("pointerdown", e => { if(!p.ready) return; drag = {x:e.clientX, off:p.view.off}; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener("pointermove", e => {
+    if(!p.ready) return;
+    if(drag){
+      const r = cv.getBoundingClientRect(), bw = (r.width - 70) / p.view.span;
+      p.view.off = Math.max(0, Math.round(drag.off + (e.clientX - drag.x) / bw));
+    }
+    p.hover = idxAt(e.clientX); draw(p);
+  });
+  const end = () => { drag = null; };
+  cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+  cv.addEventListener("pointerleave", () => { p.hover = null; draw(p); });
+  cv.addEventListener("wheel", e => {
+    if(!p.ready) return;
+    e.preventDefault();
+    const r = cv.getBoundingClientRect();
+    zoomAt(p, e.deltaY > 0 ? 1.15 : 1/1.15, Math.min(1, (e.clientX - r.left) / (r.width - 70)));
+    draw(p);
+  }, {passive:false});
+}
+
+/* ============ 主程式 ============ */
+async function loadDon(p, label){
+  /* 需要的交易時段分鐘數：回看根數的 3 倍。
+     前 look 根不會有任何訊號，而目前的部位可能是好幾週前那次突破建立的——
+     只抓「回看＋一點點」的話，會從半路開始算，進場點、停損線都跟 TradingView 對不上
+     （v1.0.0 開發時實測：只抓 23 天，那斯達克 6 分錯過 9/18 的進場、黃金錯過 9/02 的翻空）。 */
+  const look = Math.round(p.P.lookH * 60 / p.tfMin);
+  await loadKlines(p.sym, look * 3 * p.tfMin, label);
+  p.dirty = true;
+}
+async function main(){
+  buildDOM();
+  setStatus("", "載入歷史資料中");
+  try{
+    await Promise.all([
+      loadDon(PAN("nq6"), "那斯達克 1 分 K"),
+      loadDon(PAN("gold8"), "黃金 1 分 K"),
+    ]);
+  }catch(e){
+    for(const k of ["nq6", "gold8"]) $("wait-" + k).textContent = "歷史資料載入失敗：" + e.message + "，請重新整理";
+    setStatus("err", "載入失敗");
+  }
+  await updateRatio();
+  setInterval(updateRatio, 30000);
+  connectWS();
+  try{ await load30("QQQUSDT"); PAN("rf").dirty = true; }
+  catch(e){ $("wait-rf").textContent = "30 秒線合成失敗：" + e.message + "，請重新整理"; setLoad("t30", null); }
+  setInterval(save30, 60000);
+}
+// 每秒把有新資料的面板重算重畫；斷線偵測也在這裡
+setInterval(() => {
+  for(const p of PANELS){
+    if(p.dirty){ p.dirty = false; recompute(p); draw(p); }
+    renderInfo(p);
+  }
+  if(lastMsg && Date.now() - lastMsg > 20000 && WS && WS.readyState === 1){
+    setStatus("warn", "超過 20 秒沒有收到新資料，重新連線");
+    lastMsg = Date.now(); try{ WS.close(); }catch(e){}
+  }
+}, 1000);
+// 30 秒線即使沒有新成交，時間到了那根也要收盤
+setInterval(() => { const p = PAN("rf"); if(S30.ready) p.dirty = true; }, 5000);
+window.addEventListener("resize", () => PANELS.forEach(draw));
+window.addEventListener("pagehide", save30);
+window.APP = {PANELS, S30, RAW1M, get RATIO(){ return RATIO; }};
+main();
+</script>
+</body>
+</html>
