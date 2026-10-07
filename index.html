@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.0.3</title>
+<title>指數趨勢儀表板 v1.0.4</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -102,7 +102,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.0.3";
+const VERSION = "v1.0.4";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -651,7 +651,7 @@ function viewRange(p){
   const i1 = n - 1 - off;
   return {i0: Math.max(0, i1 - span + 1), i1, span};
 }
-const PADR = 4;   // 圖右側預留寬度；價格刻度疊在圖上
+const PADR = 40;   // 右側刻度欄寬的預設值；實際寬度每次繪圖依數字寬度算出，存在 p.padR
 const COL = {1:"#ff3b3b", "-1":"#4cff00", 0:"#7a8494"};
 const posCol = (p, s) => s === 0 && p.flatCol ? p.flatCol : COL[s];
 
@@ -659,8 +659,7 @@ function draw(p){
   if(!p.ready || !p.bars.length) return;
   const cv = $("cv-" + p.k), {ctx, w, h} = setupCanvas(cv);
   const B = p.bars, R = p.R, {i0, i1, span} = viewRange(p);
-  const padR = PADR, padB = 22, padT = 8, pw = w - padR, ph = h - padB - padT;
-  const bw = pw / span, X = i => (i - i0 + 0.5) * bw;
+  const padB = 22, padT = 8, ph = h - padB - padT;
   const posAt = i => i < p.done ? R.pos[i] : R.pos[p.done - 1] || 0;
 
   let lo = Infinity, hi = -Infinity;
@@ -672,20 +671,24 @@ function draw(p){
   const padY = (hi - lo) * 0.08; lo -= padY; hi += padY;
   const Y = v => padT + (hi - v) / (hi - lo) * ph;
 
+  /* 右側刻度欄：v1.0.3 把刻度疊在圖上，數字和走勢線、最新價標籤擠在一起。
+     v1.0.4 改回獨立欄位，但寬度依最寬的數字自動決定（10px 字約 38 像素），不再固定 70。 */
+  const k = p.nq && RATIO ? RATIO : 1;
+  const step = Math.max(1, niceStep((hi - lo) * k, 5)) / k;   // 刻度不顯示小數，間距至少 1
+  ctx.font = "10px system-ui,sans-serif";
+  const ticks = [];
+  for(let v = Math.ceil(lo / step) * step; v <= hi; v += step) ticks.push([v, Math.round(Y(v)) + 0.5]);
+  const lastC = B[B.length-1].c, ly = Y(lastC), lastTxt = fmtP(p, lastC);
+  const padR = Math.ceil(Math.max(ctx.measureText(lastTxt).width, ...ticks.map(t => ctx.measureText(fmtP(p, t[0])).width)) + 10);
+  p.padR = padR;
+  const pw = w - padR, bw = pw / span, X = i => (i - i0 + 0.5) * bw;
+
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = "#0e121b"; ctx.fillRect(0, 0, w, h);
 
-  // 水平格線與價格刻度（刻度用換算後的價格挑整數）
-  const k = p.nq && RATIO ? RATIO : 1;
-  const step = Math.max(1, niceStep((hi - lo) * k, 5)) / k;   // 刻度不顯示小數，間距至少 1
-  ctx.font = "11px system-ui,sans-serif";
-  const ticks = [];
-  for(let v = Math.ceil(lo / step) * step; v <= hi; v += step){
-    const y = Math.round(Y(v)) + 0.5;
-    ctx.strokeStyle = "#1b2130"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-    ticks.push([v, y]);   // 刻度數字等線畫完再疊上去，才不會被線蓋住
-  }
+  // 水平格線
+  ctx.strokeStyle = "#1b2130"; ctx.lineWidth = 1;
+  for(const [, y] of ticks){ ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(pw, y); ctx.stroke(); }
   // 時間刻度：每隔至少 90 像素標一次，跨日標日期
   const every = Math.max(1, Math.ceil(90 / bw));
   ctx.textBaseline = "alphabetic"; ctx.textAlign = "center";
@@ -738,25 +741,20 @@ function draw(p){
     ctx.fill();
   }
 
-  // 價格刻度：疊在圖的右側（v1.0.3 起不另留 70 像素的刻度欄），墊半透明底
-  ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+  // 價格刻度：畫在右側欄，跟最新價標籤太近的那個不畫，免得疊在一起
+  ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillStyle = "#7d869d";
   for(const [v, y] of ticks){
-    if(y < padT + 12) continue;
-    const t = fmtP(p, v), tw = ctx.measureText(t).width;
-    ctx.fillStyle = "rgba(14,18,27,.75)"; ctx.fillRect(w - tw - 6, y - 14, tw + 5, 13);
-    ctx.fillStyle = "#7d869d"; ctx.fillText(t, w - 3, y - 1);
+    if(y < padT + 5 || y > padT + ph - 2 || Math.abs(y - ly) < 13) continue;
+    ctx.fillText(fmtP(p, v), w - 4, y);
   }
   ctx.textAlign = "left";
 
   // 最新價虛線與標籤
-  const lastC = B[B.length-1].c, ly = Y(lastC);
   if(p.view.off === 0 || (ly > padT && ly < padT + ph)){
     ctx.setLineDash([2, 3]); ctx.strokeStyle = "#22c7e8"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(pw, ly); ctx.stroke(); ctx.setLineDash([]);
-    const txt = fmtP(p, lastC);
-    const tw = ctx.measureText(txt).width;
-    ctx.fillStyle = "#22c7e8"; ctx.fillRect(w - tw - 8, ly - 9, tw + 8, 18);
-    ctx.fillStyle = "#03121a"; ctx.textBaseline = "middle"; ctx.textAlign = "right"; ctx.fillText(txt, w - 4, ly);
+    ctx.fillStyle = "#22c7e8"; ctx.fillRect(pw + 1, ly - 8, padR - 1, 16);
+    ctx.fillStyle = "#03121a"; ctx.textBaseline = "middle"; ctx.textAlign = "right"; ctx.fillText(lastTxt, w - 4, ly);
     ctx.textAlign = "left";
   }
 
@@ -785,14 +783,14 @@ function bindChart(p){
   let drag = null;
   const idxAt = ex => {
     const r = cv.getBoundingClientRect(), {i0, span} = viewRange(p);
-    const pw = r.width - PADR;
+    const pw = r.width - (p.padR || PADR);
     return Math.max(0, Math.min(p.bars.length - 1, i0 + Math.floor((ex - r.left) / pw * span)));
   };
   cv.addEventListener("pointerdown", e => { if(!p.ready) return; drag = {x:e.clientX, off:p.view.off}; cv.setPointerCapture(e.pointerId); });
   cv.addEventListener("pointermove", e => {
     if(!p.ready) return;
     if(drag){
-      const r = cv.getBoundingClientRect(), bw = (r.width - PADR) / p.view.span;
+      const r = cv.getBoundingClientRect(), bw = (r.width - (p.padR || PADR)) / p.view.span;
       p.view.off = Math.max(0, Math.round(drag.off + (e.clientX - drag.x) / bw));
     }
     p.hover = idxAt(e.clientX); draw(p);
@@ -804,7 +802,7 @@ function bindChart(p){
     if(!p.ready) return;
     e.preventDefault();
     const r = cv.getBoundingClientRect();
-    zoomAt(p, e.deltaY > 0 ? 1.15 : 1/1.15, Math.min(1, (e.clientX - r.left) / (r.width - PADR)));
+    zoomAt(p, e.deltaY > 0 ? 1.15 : 1/1.15, Math.min(1, (e.clientX - r.left) / (r.width - (p.padR || PADR))));
     draw(p);
   }, {passive:false});
 }
