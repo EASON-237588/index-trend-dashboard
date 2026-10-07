@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.0.4</title>
+<title>指數趨勢儀表板 v1.0.5</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -102,7 +102,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.0.4";
+const VERSION = "v1.0.5";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -292,7 +292,7 @@ const PANELS = [
   {k:"nq6", title:"那斯達克", tf:"中長趨勢", sym:"QQQUSDT", nq:true, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00",
    sub:"Donchian 回看 350 小時（3,500 根）・只做多・停損 8 ATR",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:6}},
-  {k:"gold8", title:"黃金", tf:"8 分", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9,
+  {k:"gold8", title:"黃金", tf:"中長趨勢", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
    P:{lookH:350, mode:"both", stopAtr:8, atrLen:14, tfMin:8}},
 ];
@@ -596,7 +596,9 @@ function renderInfo(p){
   const R = p.R, B = p.bars, last = B[B.length-1];
   const e = entryOf(p) || {side:0};
   const badge = $("dir-" + p.k);
-  badge.className = "badge " + (e.side > 0 ? "long" : (e.side < 0 || p.flatCol) ? "short" : "");
+  // 空手時標籤顏色跟線色一致：那斯達克中長趨勢空手畫綠、黃金空手畫紅
+  const flatCls = p.flatCol === COL[1] ? "long" : p.flatCol ? "short" : "";
+  badge.className = "badge " + (e.side > 0 ? "long" : e.side < 0 ? "short" : flatCls);
   badge.textContent = e.side > 0 ? "持多" : e.side < 0 ? "持空" : "空手";
 
   let pnl = "—", pnlCls = "";
