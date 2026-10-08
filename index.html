@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.2.0</title>
+<title>指數趨勢儀表板 v1.2.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -88,7 +88,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
     <div id="ratioTxt"></div>
   <ul>
     <li><b>那斯達克中長趨勢</b>（v1.1.0 起）用的是 Yahoo 的真 NQ 期貨，經自己的 Cloudflare 中繼站轉接，<b>延遲約 10 分鐘</b>。一筆單通常抱十幾天，晚 10 分鐘影響很小。Yahoo 最多給約 60 天的資料，部位抱超過約 45 天時會看不到真正的進場點。</li>
-    <li><b>短趨勢・參考</b>（v1.2.0 新增，第二格）：Hyperliquid 那斯達克 100 合約的 1 分 K，同一套 Range Filter，取樣 100、倍數 16（1 分 K 沒有 30 秒，取樣減半；每根漲跌只大約 1.4 倍，所以倍數用 23÷1.4）。2026-10-08 對過去 3 天 TradingView 30 秒的 7 次翻轉：全部對上、平均差不到 1 分鐘、沒有半夜假翻轉。樣本還小，放著跟第一格對照觀察，對得上再考慮取代。只算 CME 交易時段，預設顯示最近約 35 小時。</li>
+    <li><b>短趨勢・參考</b>（v1.2.0 新增，第二格）：Hyperliquid 那斯達克 100 合約的 1 分 K，同一套 Range Filter，取樣 100、倍數 16（1 分 K 沒有 30 秒，取樣減半；每根漲跌只大約 1.4 倍，所以倍數用 23÷1.4）。2026-10-08 對過去 3 天 TradingView 30 秒的 7 次翻轉：全部對上、平均差不到 1 分鐘、沒有半夜假翻轉。樣本還小，放著跟第一格對照觀察，對得上再考慮取代。只算 CME 交易時段，顯示範圍自動對齊第一格的起點。</li>
     <li><b>那斯達克短趨勢</b>仍用 Binance 的 QQQ 永續合約算：NQ 沒有免費的秒級即時來源，只能用追蹤同一個指數的合約代替，成交量與夜盤走勢不會跟 NQ 完全一樣。價格依 Hyperliquid 的那斯達克 100 合約即時換算成指數點數，換算不到時會改顯示 QQQ 原價並在上方標明。</li>
     <li><b>黃金</b>用 Binance 的黃金永續合約，價位跟 TradingView 的 GOLD 會有幾塊錢的差距。</li>
     <li>已剔除美國期貨休市時段（美東週五 17:00 到週日 18:00、每天 17:00 到 18:00），K 棒從美東 18:00 開盤起算，跟 TradingView 的 NQ 與 GOLD 切法一致。</li>
@@ -103,7 +103,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.2.0";
+const VERSION = "v1.2.1";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -545,6 +545,12 @@ function recompute(p){
     const raw = RAW1M[p.sym]; if(!raw) return;
     B = raw.filter(b => cmeOpen(b.t));
     p.done = B.length && B[B.length-1].t + 60000 > Date.now() ? B.length - 1 : B.length;
+    // v1.2.1：顯示範圍按時間對齊上面 30 秒那格的第一根（v1.2.0 固定 2,100 根，兩格起點差一個多小時）
+    if(S30.bars.length){
+      const t0 = S30.bars[0].t;
+      p.span = Math.max(30, B.filter(b => b.t >= t0).length);
+      if(!p.userZoom) p.view.span = p.span;
+    }
   }else if(p.kind === "rf"){
     if(!S30.ready) return;
     B = S30.bars;
@@ -589,7 +595,7 @@ function buildDOM(){
   for(const p of PANELS) bindChart(p);
   document.querySelectorAll(".zoom button").forEach(b => b.onclick = () => {
     const p = PAN(b.dataset.k), z = b.dataset.z;
-    if(z === "reset") p.view = {span:p.span, off:0};
+    if(z === "reset"){ p.view = {span:p.span, off:0}; p.userZoom = false; }
     else zoomAt(p, z === "in" ? 0.7 : 1/0.7, 1);
     draw(p);
   });
@@ -745,7 +751,7 @@ function draw(p){
     colorLine(i => i < p.done ? R.filt[i] : (p.done ? R.filt[p.done - 1] : null),
               i => COL[i < p.done ? R.fcol[i] : R.fcol[p.done - 1]], 2.5);
   }else{
-    colorLine(i => B[i].c, i => posCol(p, posAt(i)), 2);
+    colorLine(i => B[i].c, i => posCol(p, posAt(i)), 1.4);   // v1.2.1：2 → 1.4（使用者說太粗，縮 0.7）
   }
 
   // 訊號三角形：只標進場（翻多紅、翻空綠）
@@ -789,6 +795,7 @@ function draw(p){
 
 // 以畫面某個位置為錨點縮放（anchor01：0＝最左、1＝最右）
 function zoomAt(p, f, anchor01){
+  p.userZoom = true;   // 使用者自己縮放過，就不再自動對齊時間範圍
   const {i0, span} = viewRange(p), n = p.bars.length;
   const idx = i0 + anchor01 * span;
   const ns = Math.max(30, Math.min(n, Math.round(span * f)));
