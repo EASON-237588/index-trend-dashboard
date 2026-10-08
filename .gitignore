@@ -1,2 +1,3 @@
 index.html.bak*
 __pycache__/
+worker/.wrangler/
