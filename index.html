@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.1.0</title>
+<title>指數趨勢儀表板 v1.2.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -88,6 +88,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
     <div id="ratioTxt"></div>
   <ul>
     <li><b>那斯達克中長趨勢</b>（v1.1.0 起）用的是 Yahoo 的真 NQ 期貨，經自己的 Cloudflare 中繼站轉接，<b>延遲約 10 分鐘</b>。一筆單通常抱十幾天，晚 10 分鐘影響很小。Yahoo 最多給約 60 天的資料，部位抱超過約 45 天時會看不到真正的進場點。</li>
+    <li><b>短趨勢・參考</b>（v1.2.0 新增，第二格）：Hyperliquid 那斯達克 100 合約的 1 分 K，同一套 Range Filter，取樣 100、倍數 16（1 分 K 沒有 30 秒，取樣減半；每根漲跌只大約 1.4 倍，所以倍數用 23÷1.4）。2026-10-08 對過去 3 天 TradingView 30 秒的 7 次翻轉：全部對上、平均差不到 1 分鐘、沒有半夜假翻轉。樣本還小，放著跟第一格對照觀察，對得上再考慮取代。只算 CME 交易時段，預設顯示最近約 35 小時。</li>
     <li><b>那斯達克短趨勢</b>仍用 Binance 的 QQQ 永續合約算：NQ 沒有免費的秒級即時來源，只能用追蹤同一個指數的合約代替，成交量與夜盤走勢不會跟 NQ 完全一樣。價格依 Hyperliquid 的那斯達克 100 合約即時換算成指數點數，換算不到時會改顯示 QQQ 原價並在上方標明。</li>
     <li><b>黃金</b>用 Binance 的黃金永續合約，價位跟 TradingView 的 GOLD 會有幾塊錢的差距。</li>
     <li>已剔除美國期貨休市時段（美東週五 17:00 到週日 18:00、每天 17:00 到 18:00），K 棒從美東 18:00 開盤起算，跟 TradingView 的 NQ 與 GOLD 切法一致。</li>
@@ -102,7 +103,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.1.0";
+const VERSION = "v1.2.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -289,6 +290,12 @@ const PANELS = [
   {k:"rf", title:"那斯達克", tf:"短趨勢", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
    sub:"Range Filter 取樣 200・倍數 23・多空反轉（線色＝濾網方向）",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  /* v1.2.0 新增參考格：Hyperliquid 1 分 K 沒有 30 秒，取樣減半成 100、倍數 23÷√2≈16 換算。
+     2026-10-08 對 TradingView 30 秒 3 天 7 次翻轉：全對上、平均差不到 1 分、無半夜假翻轉；樣本小，觀察中。
+     預設只顯示最近 2,100 根（約 35 小時），跟上面 30 秒那格的時間範圍對齊。 */
+  {k:"hl", title:"那斯達克", tf:"短趨勢・參考", sym:"xyz:XYZ100", src:"hl", nq:false, kind:"rf", span:2100,
+   sub:"Hyperliquid 那斯達克 100 合約 1 分 K・Range Filter 取樣 100・倍數 16",
+   P:{per:100, mult:16, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   // v1.1.0 起改用 Yahoo 真 NQ 期貨（經中繼站），價格本身就是 NQ 點數，不換算
   {k:"nq6", title:"那斯達克", tf:"中長趨勢", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00",
    sub:"NQ 期貨（Yahoo 延遲約 10 分鐘）・Donchian 回看 350 小時（3,500 根）・只做多・停損 8 ATR",
@@ -533,7 +540,12 @@ async function backfill(){
 /* ============ 計算 ============ */
 function recompute(p){
   let B;
-  if(p.kind === "rf"){
+  if(p.src === "hl"){
+    // 只留 CME 交易時段，跟 30 秒那格與 TradingView 的切法一致
+    const raw = RAW1M[p.sym]; if(!raw) return;
+    B = raw.filter(b => cmeOpen(b.t));
+    p.done = B.length && B[B.length-1].t + 60000 > Date.now() ? B.length - 1 : B.length;
+  }else if(p.kind === "rf"){
     if(!S30.ready) return;
     B = S30.bars;
     const now = Date.now();
@@ -824,6 +836,23 @@ async function loadYahoo(p){
   RAW1M[p.sym] = j.bars.map(b => ({t:b[0], o:b[1], h:b[2], l:b[3], c:b[4], v:0}));
   p.dirty = true;
 }
+/* Hyperliquid 1 分 K：一次最多給約 5,000 根（3.5 天），暖機 600 根綽綽有餘。
+   有開 CORS，網頁直接讀，不必經中繼站。之後每 15 秒抓最近 10 分鐘併進去。 */
+const HL_INFO = "https://api.hyperliquid.xyz/info";
+async function hlCandles(coin, start){
+  const r = await jget(HL_INFO, {method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({type:"candleSnapshot", req:{coin, interval:"1m", startTime:start, endTime:Date.now() + 60000}})});
+  return r.map(k => ({t:+k.t, o:+k.o, h:+k.h, l:+k.l, c:+k.c, v:+k.v}));
+}
+async function loadHL(p){
+  RAW1M[p.sym] = await hlCandles(p.sym, Date.now() - 5000 * 60000);
+  p.dirty = true;
+}
+async function pollHL(p){
+  if(!RAW1M[p.sym]) return;
+  for(const b of await hlCandles(p.sym, Date.now() - 10 * 60000)) mergeKline(p.sym, b);
+  p.dirty = true;
+}
 async function loadDon(p, label){
   if(p.src === "yahoo") return loadYahoo(p);
   /* 需要的交易時段分鐘數：回看根數的 3 倍。
@@ -841,6 +870,7 @@ async function main(){
     await Promise.all([
       loadDon(PAN("nq6"), "那斯達克 NQ 期貨"),
       loadDon(PAN("gold8"), "黃金 1 分 K"),
+      loadHL(PAN("hl")).catch(e => { $("wait-hl").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
     ]);
   }catch(e){
     for(const k of ["nq6", "gold8"]) $("wait-" + k).textContent = "歷史資料載入失敗：" + e.message + "，請重新整理";
@@ -854,6 +884,7 @@ async function main(){
   setInterval(save30, 60000);
   // NQ 期貨沒有即時推送，每分鐘向中繼站重抓（中繼站本身也快取 60 秒）
   setInterval(() => { loadYahoo(PAN("nq6")).catch(() => {}); }, 60000);
+  setInterval(() => { pollHL(PAN("hl")).catch(() => {}); }, 15000);
 }
 // 每秒把有新資料的面板重算重畫；斷線偵測也在這裡
 setInterval(() => {
