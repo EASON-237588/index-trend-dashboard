@@ -308,23 +308,25 @@ def update(k, B, pos, warm, contract, nqconv=None, min_t=None):
 
 # ============ 績效 ============
 def perf(k, rows, last_price, last_t, nq_last=None):
-    pts = pct = 0.0; n = win = 0; side = 0; ent = None; ent_nq = None; ent_t = None
+    pts = pct = 0.0; n = win = 0; side = 0; ent = None; ent_nq = None; ent_t = None; trades = []
     for r in rows:
         p = float(r["價格"]); pn = float(r["換算那斯達克"]) if r["換算那斯達克"] else p
         new_side = {"多": 1, "空": -1, "空手": 0}[r["部位"]]
         if r["動作"] == "換倉":  # 舊約平倉價寫在備註
             old = float(r["備註"].split("舊約平倉 ")[1].split(" ")[0])
             g = (old - ent) * side; pts += g; pct += g / ent * 100; n += 1; win += g > 0
+            trades.append((SIDE[side], ent_t, ent_nq, r["時間"] + " 換倉", old, g, g / ent * 100, pts))
             ent = p; ent_nq = pn; ent_t = r["時間"]; continue
         if side != 0 and new_side != side:
             g = (p / ent - 1) * side; pts += g * ent_nq; pct += g * 100; n += 1; win += g > 0
+            trades.append((SIDE[side], ent_t, ent_nq, r["時間"], pn, g * ent_nq, g * 100, pts))
         if new_side != side:
             side = new_side; ent = p if side else None; ent_nq = pn if side else None; ent_t = r["時間"] if side else None
     op = None
     if side:
         g = (last_price / ent - 1) * side
         op = dict(side=SIDE[side], t=ent_t, p=ent_nq, now=nq_last or last_price, pts=g * ent_nq, pct=g * 100)
-    return dict(n=n, win=win, pts=pts, pct=pct, op=op)
+    return dict(n=n, win=win, pts=pts, pct=pct, op=op, trades=trades)
 
 # ============ 主程式 ============
 if __name__ == "__main__":
@@ -396,3 +398,6 @@ if __name__ == "__main__":
         else:
             print("   目前空手")
         print(f"   合計 {tot_pts:+,.0f} {unit}（{tot_pct:+.2f}%）")
+        print("   逐筆明細（# 方向 進場時間 進場價 → 出場時間 出場價 盈虧 % 累計）")
+        for i, (sd, et, ep, xt, xp, g, gp, cum) in enumerate(p["trades"], 1):
+            print(f"   {i:>2} {sd} {et} {ep:,.2f} → {xt} {xp:,.2f}  {g:+,.0f}（{gp:+.2f}%） 累計 {cum:+,.0f}")
