@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.4.0</title>
+<title>指數趨勢儀表板 v1.4.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -32,9 +32,18 @@ h1 small{font-size:11px;color:var(--mute);font-weight:400;margin-left:5px}
 .tabs button{font-size:12px;color:var(--mute);background:var(--panel);border:0;padding:3px 9px;cursor:pointer;white-space:nowrap}
 .tabs button+button{border-left:1px solid var(--line)}
 .tabs button.on{color:#0b0e14;background:var(--tag);font-weight:700}
+/* v1.4.1 多了「曲線圖」按鈕，手機寬度下標題列會超出 53px、「說明」被擠出畫面：窄螢幕縮間距與內距 */
+@media (max-width:440px){
+  header{gap:4px;padding-left:6px;padding-right:6px}
+  h1{letter-spacing:0}
+  .tabs button{padding:3px 6px}
+  header .hbtn{padding:3px 6px}
+  header .hbtn+.hbtn{margin-left:0}
+}
 .status{font-size:11px;color:var(--mute);display:flex;align-items:center;gap:5px;min-width:0;white-space:nowrap;overflow:hidden}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block;flex:none}
 .dot.live{background:#2ecc71}.dot.warn{background:var(--warn)}.dot.err{background:var(--long)}
+.hbtn+.hbtn{margin-left:6px}
 .hbtn{margin-left:auto;flex:none;font-size:12px;color:var(--text);background:var(--panel);border:1px solid var(--line);
   border-radius:6px;padding:3px 10px;cursor:pointer}
 .loadbar{position:absolute;left:10px;right:10px;top:38px;z-index:5;height:22px;border-radius:6px;background:var(--panel);
@@ -83,10 +92,20 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
   <h1>指數趨勢儀表板<small id="ver"></small></h1>
   <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="long">中長趨勢</button></div>
   <div class="status"><i class="dot" id="dot"></i><span id="stTxt">準備中</span></div>
+  <button class="hbtn" id="curveBtn">曲線圖</button>
   <button class="hbtn" id="notesBtn">說明</button>
 </header>
 <div class="loadbar" id="loadBar" hidden><div class="fill" id="loadFill"></div><span id="loadTxt"></span></div>
 <main class="grid" id="grid"></main>
+</div>
+
+<!-- v1.4.1：績效曲線圖，由 實際紀錄/更新紀錄.py 每次開工時重畫 -->
+<div class="sheet" id="curveSheet" hidden>
+  <div class="in">
+    <div class="top">績效曲線（實際紀錄）<button class="hbtn" id="curveClose">關閉</button></div>
+    <div id="curveNote" style="font-size:11px;margin-bottom:6px">每次開工跑紀錄時更新・已實現＋持有中浮動・未扣手續費</div>
+    <img id="curveImg" alt="績效曲線圖" style="display:block;width:100%;border-radius:6px;background:#fafaf8">
+  </div>
 </div>
 
 <div class="sheet" id="sheet" hidden>
@@ -111,7 +130,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.4.0";
+const VERSION = "v1.4.1";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -606,6 +625,14 @@ function buildDOM(){
     </div>
   </section>`).join("");
   $("notesBtn").onclick = () => { $("sheet").hidden = false; };
+  $("curveBtn").onclick = () => {
+    $("curveImg").hidden = false;
+    $("curveImg").src = "實際紀錄/績效曲線.png?t=" + Date.now();   // 每次開都抓最新的圖
+    $("curveSheet").hidden = false;
+  };
+  $("curveImg").onerror = () => { $("curveImg").hidden = true; $("curveNote").textContent = "還沒有曲線圖：開工跑一次實際紀錄後才會產生"; };
+  $("curveClose").onclick = () => { $("curveSheet").hidden = true; };
+  $("curveSheet").onclick = e => { if(e.target.id === "curveSheet") $("curveSheet").hidden = true; };
   $("notesClose").onclick = () => { $("sheet").hidden = true; };
   $("sheet").onclick = e => { if(e.target.id === "sheet") $("sheet").hidden = true; };
   for(const p of PANELS) bindChart(p);
