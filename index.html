@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.2.1</title>
+<title>指數趨勢儀表板 v1.3.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -27,6 +27,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 header{flex:none;display:flex;align-items:center;gap:8px;padding:7px 10px 5px}
 h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.5px;white-space:nowrap}
 h1 small{font-size:11px;color:var(--mute);font-weight:400;margin-left:5px}
+/* v1.3.0：四格擠在一頁太小，分成「短趨勢」「中長趨勢」兩頁，各兩格，用版本號旁的按鈕切換 */
+.tabs{flex:none;display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.tabs button{font-size:12px;color:var(--mute);background:var(--panel);border:0;padding:3px 9px;cursor:pointer;white-space:nowrap}
+.tabs button+button{border-left:1px solid var(--line)}
+.tabs button.on{color:#0b0e14;background:var(--tag);font-weight:700}
 .status{font-size:11px;color:var(--mute);display:flex;align-items:center;gap:5px;min-width:0;white-space:nowrap;overflow:hidden}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block;flex:none}
 .dot.live{background:#2ecc71}.dot.warn{background:var(--warn)}.dot.err{background:var(--long)}
@@ -38,6 +43,7 @@ h1 small{font-size:11px;color:var(--mute);font-weight:400;margin-left:5px}
 .loadbar .fill{position:absolute;inset:0 auto 0 0;width:0;background:#1d3557;transition:width .3s}
 .loadbar span{position:relative;line-height:20px;padding:0 8px;color:#cfe3ff;white-space:nowrap}
 .grid{flex:1;min-height:0;display:flex;flex-direction:column;gap:5px;padding:0 6px 6px}
+.panel[hidden]{display:none}
 .panel{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);
   border-radius:8px;padding:5px 7px 6px}
 .ph{flex:none;display:flex;align-items:center;gap:6px;white-space:nowrap}
@@ -75,6 +81,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 <div class="app">
 <header>
   <h1>指數趨勢儀表板<small id="ver"></small></h1>
+  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="long">中長趨勢</button></div>
   <div class="status"><i class="dot" id="dot"></i><span id="stTxt">準備中</span></div>
   <button class="hbtn" id="notesBtn">說明</button>
 </header>
@@ -103,7 +110,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.2.1";
+const VERSION = "v1.3.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -287,20 +294,20 @@ function calcDon(B, P){
 
 /* ============ 面板設定（參數讀自 TradingView 版面 JuwDqkR0，2026-10-07） ============ */
 const PANELS = [
-  {k:"rf", title:"那斯達克", tf:"短趨勢", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
+  {k:"rf", pg:"short", title:"那斯達克", tf:"短趨勢", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
    sub:"Range Filter 取樣 200・倍數 23・多空反轉（線色＝濾網方向）",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.2.0 新增參考格：Hyperliquid 1 分 K 沒有 30 秒，取樣減半成 100、倍數 23÷√2≈16 換算。
      2026-10-08 對 TradingView 30 秒 3 天 7 次翻轉：全對上、平均差不到 1 分、無半夜假翻轉；樣本小，觀察中。
      預設只顯示最近 2,100 根（約 35 小時），跟上面 30 秒那格的時間範圍對齊。 */
-  {k:"hl", title:"那斯達克", tf:"短趨勢・參考", sym:"xyz:XYZ100", src:"hl", nq:false, kind:"rf", span:2100,
+  {k:"hl", pg:"short", title:"那斯達克", tf:"短趨勢・參考", sym:"xyz:XYZ100", src:"hl", nq:false, kind:"rf", span:2100,
    sub:"Hyperliquid 那斯達克 100 合約 1 分 K・Range Filter 取樣 100・倍數 16",
    P:{per:100, mult:16, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   // v1.1.0 起改用 Yahoo 真 NQ 期貨（經中繼站），價格本身就是 NQ 點數，不換算
-  {k:"nq6", title:"那斯達克", tf:"中長趨勢", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00",
+  {k:"nq6", pg:"long", title:"那斯達克", tf:"中長趨勢", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00",
    sub:"NQ 期貨（Yahoo 延遲約 10 分鐘）・Donchian 回看 350 小時（3,500 根）・只做多・停損 8 ATR",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:6}},
-  {k:"gold8", title:"黃金", tf:"中長趨勢", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
+  {k:"gold8", pg:"long", title:"黃金", tf:"中長趨勢", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
    P:{lookH:350, mode:"both", stopAtr:8, atrLen:14, tfMin:8}},
 ];
@@ -593,6 +600,9 @@ function buildDOM(){
   $("notesClose").onclick = () => { $("sheet").hidden = true; };
   $("sheet").onclick = e => { if(e.target.id === "sheet") $("sheet").hidden = true; };
   for(const p of PANELS) bindChart(p);
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => showPage(b.dataset.pg));
+  let pg = "short"; try{ pg = localStorage.getItem(PAGE_KEY) || "short"; }catch(e){}
+  showPage(pg);
   document.querySelectorAll(".zoom button").forEach(b => b.onclick = () => {
     const p = PAN(b.dataset.k), z = b.dataset.z;
     if(z === "reset"){ p.view = {span:p.span, off:0}; p.userZoom = false; }
@@ -656,6 +666,15 @@ function renderInfo(p){
   $("kv-" + p.k).innerHTML = parts.join(" · ");
 }
 
+/* v1.3.0 分頁：只顯示目前那頁的兩格；四格資料都在背景持續更新，切頁不重新載入。記住上次停的頁。 */
+const PAGE_KEY = "itd-page";
+function showPage(pg){
+  if(!PANELS.some(p => p.pg === pg)) pg = "short";
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.pg === pg));
+  for(const p of PANELS) $("p-" + p.k).hidden = p.pg !== pg;
+  try{ localStorage.setItem(PAGE_KEY, pg); }catch(e){}
+  for(const p of PANELS) if(p.pg === pg) draw(p);
+}
 function setupCanvas(cv){
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
   if(cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
@@ -681,6 +700,7 @@ const posCol = (p, s) => s === 0 && p.flatCol ? p.flatCol : COL[s];
 
 function draw(p){
   if(!p.ready || !p.bars.length) return;
+  if($("p-" + p.k).hidden) return;   // 另一頁的格子：資料照常更新，切過來時再畫
   const cv = $("cv-" + p.k), {ctx, w, h} = setupCanvas(cv);
   const B = p.bars, R = p.R, {i0, i1, span} = viewRange(p);
   const padB = 22, padT = 8, ph = h - padB - padT;
