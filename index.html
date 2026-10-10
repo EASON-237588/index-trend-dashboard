@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.4.2</title>
+<title>指數趨勢儀表板 v1.4.3</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -46,7 +46,9 @@ h1 small{font-size:11px;color:var(--mute);font-weight:400;margin-left:5px}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
 /* v1.4.2：狀態只留燈號（連線正常綠燈閃爍），文字不顯示，改成燈號的提示文字 */
 #stTxt{display:none}
-.status{flex:none;margin-left:2px}.dot.warn{background:var(--warn)}.dot.err{background:var(--long)}
+.status{flex:none;margin-left:auto}
+/* v1.4.3：曲線圖緊貼在中長趨勢右邊，燈號靠最右 */
+#curveBtn{margin-left:0}.dot.warn{background:var(--warn)}.dot.err{background:var(--long)}
 .hbtn+.hbtn{margin-left:6px}
 .hbtn{margin-left:auto;flex:none;font-size:12px;color:var(--text);background:var(--panel);border:1px solid var(--line);
   border-radius:6px;padding:3px 10px;cursor:pointer}
@@ -116,7 +118,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.4.2";
+const VERSION = "v1.4.3";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
