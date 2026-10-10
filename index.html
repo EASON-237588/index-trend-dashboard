@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.3.0</title>
+<title>指數趨勢儀表板 v1.4.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -95,6 +95,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
     <div id="ratioTxt"></div>
   <ul>
     <li><b>那斯達克中長趨勢</b>（v1.1.0 起）用的是 Yahoo 的真 NQ 期貨，經自己的 Cloudflare 中繼站轉接，<b>延遲約 10 分鐘</b>。一筆單通常抱十幾天，晚 10 分鐘影響很小。Yahoo 最多給約 60 天的資料，部位抱超過約 45 天時會看不到真正的進場點。</li>
+    <li><b>短趨勢 A-1 與 A-2</b>（v1.4.0）：A-1 是原來的第一格（取樣 200、倍數 23），A-2 是新加的（取樣 400、倍數 16），兩格用同一份 30 秒線、只差參數。A-2 是 2026-10-10 用 10/6 起的資料掃描挑出來的候選，驗證半年比 A-1 好很多，但交易筆數多、很怕手續費，也沒贏過買進持有。兩格並行觀察至少一個月，實際進出紀錄與 A-1 同樣從 2026-10-06 起算；但 A-2 的參數是用這幾天的資料挑的，10/6～10/10 的成績偏好看，要看 10/12 開盤之後的表現才公平。</li>
     <li><b>短趨勢・參考</b>（v1.2.0 新增，第二格）：Hyperliquid 那斯達克 100 合約的 1 分 K，同一套 Range Filter，取樣 100、倍數 16（1 分 K 沒有 30 秒，取樣減半；每根漲跌只大約 1.4 倍，所以倍數用 23÷1.4）。2026-10-08 對過去 3 天 TradingView 30 秒的 7 次翻轉：全部對上、平均差不到 1 分鐘、沒有半夜假翻轉。樣本還小，放著跟第一格對照觀察，對得上再考慮取代。只算 CME 交易時段，顯示範圍自動對齊第一格的起點。</li>
     <li><b>那斯達克短趨勢</b>仍用 Binance 的 QQQ 永續合約算：NQ 沒有免費的秒級即時來源，只能用追蹤同一個指數的合約代替，成交量與夜盤走勢不會跟 NQ 完全一樣。價格依 Hyperliquid 的那斯達克 100 合約即時換算成指數點數，換算不到時會改顯示 QQQ 原價並在上方標明。</li>
     <li><b>黃金</b>用 Binance 的黃金永續合約，價位跟 TradingView 的 GOLD 會有幾塊錢的差距。</li>
@@ -110,7 +111,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.3.0";
+const VERSION = "v1.4.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -294,9 +295,15 @@ function calcDon(B, P){
 
 /* ============ 面板設定（參數讀自 TradingView 版面 JuwDqkR0，2026-10-07） ============ */
 const PANELS = [
-  {k:"rf", pg:"short", title:"那斯達克", tf:"短趨勢", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
+  {k:"rf", pg:"short", title:"那斯達克", tf:"短趨勢・A-1", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
    sub:"Range Filter 取樣 200・倍數 23・多空反轉（線色＝濾網方向）",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  /* v1.4.0 新增 A-2：同一份 30 秒線，取樣 400・倍數 16。2026-10-10 用 10/6 起的資料掃描挑出，
+     驗證半年（4/20～10/05）+12.3%、現用 A-1 為 −43.5%，但很怕成本、也沒贏過買進持有。
+     與 A-1 並行觀察至少一個月再決定用哪個（10/6～10/10 是挑參數用的樣本內，公平比較看 10/12 之後）。 */
+  {k:"rf2", pg:"short", title:"那斯達克", tf:"短趨勢・A-2", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
+   sub:"Range Filter 取樣 400・倍數 16・多空反轉（與 A-1 並行觀察）",
+   P:{per:400, mult:16, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.2.0 新增參考格：Hyperliquid 1 分 K 沒有 30 秒，取樣減半成 100、倍數 23÷√2≈16 換算。
      2026-10-08 對 TradingView 30 秒 3 天 7 次翻轉：全對上、平均差不到 1 分、無半夜假翻轉；樣本小，觀察中。
      預設只顯示最近 2,100 根（約 35 小時），跟上面 30 秒那格的時間範圍對齊。 */
@@ -313,6 +320,8 @@ const PANELS = [
 ];
 for(const p of PANELS){ p.bars = []; p.done = 0; p.R = null; p.view = {span:p.span, off:0}; p.hover = null; p.dirty = false; p.ready = false; }
 const PAN = k => PANELS.find(p => p.k === k);
+// v1.4.0：30 秒線有 A-1、A-2 兩格共用，新成交進來時兩格都要重算
+const dirty30 = () => PANELS.forEach(p => { if(p.kind === "rf" && !p.src) p.dirty = true; });
 
 // 訊號與狀態列的價格：那斯達克換算成指數點數
 let RATIO = null;
@@ -512,7 +521,7 @@ function connectWS(){
       const tr = {a:d.a, p:d.p, q:d.q, T:d.T};
       if(!S30.ready){ S30.pending.push(tr); return; }
       if(S30.lastId != null && tr.a > S30.lastId + 1) gapFill(tr.a - 1);
-      addTrade(tr); PAN("rf").dirty = true;
+      addTrade(tr); dirty30();
     }else if(d.e === "kline"){
       const k = d.k, sym = d.s;
       mergeKline(sym, {t:k.t, o:+k.o, h:+k.h, l:+k.l, c:+k.c, v:+k.v});
@@ -906,8 +915,8 @@ async function main(){
   await updateRatio();
   setInterval(updateRatio, 30000);
   connectWS();
-  try{ await load30("QQQUSDT"); PAN("rf").dirty = true; updateRatio(); }
-  catch(e){ $("wait-rf").textContent = "30 秒線合成失敗：" + e.message + "，請重新整理"; setLoad("t30", null); }
+  try{ await load30("QQQUSDT"); dirty30(); updateRatio(); }
+  catch(e){ PANELS.filter(p => p.kind === "rf" && !p.src).forEach(p => { $("wait-" + p.k).textContent = "30 秒線合成失敗：" + e.message + "，請重新整理"; }); setLoad("t30", null); }
   setInterval(save30, 60000);
   // NQ 期貨沒有即時推送，每分鐘向中繼站重抓（中繼站本身也快取 60 秒）
   setInterval(() => { loadYahoo(PAN("nq6")).catch(() => {}); }, 60000);
@@ -925,7 +934,7 @@ setInterval(() => {
   }
 }, 1000);
 // 30 秒線即使沒有新成交，時間到了那根也要收盤
-setInterval(() => { const p = PAN("rf"); if(S30.ready) p.dirty = true; }, 5000);
+setInterval(() => { if(S30.ready) dirty30(); }, 5000);
 window.addEventListener("resize", () => PANELS.forEach(draw));
 window.addEventListener("pagehide", save30);
 window.APP = {PANELS, S30, RAW1M, get RATIO(){ return RATIO; }};

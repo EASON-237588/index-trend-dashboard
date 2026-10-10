@@ -30,8 +30,14 @@ NOW = int(time.time() * 1000)
 def ms(y, m, d, h=0):  # 台北時間 → 毫秒
     return int(datetime(y, m, d, h, tzinfo=timezone(timedelta(hours=8))).timestamp() * 1000)
 
-START = {"A": ms(2026, 10, 6), "B": ms(2026, 10, 6), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15)}
-NAME = {"A": "那斯達克短趨勢", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢", "D": "黃金中長趨勢"}
+# A2＝A-2（取樣 400、倍數 16），起算日與 A-1 同為 10/6，方便並排比較。
+# 注意：A-2 的參數是用 10/6～10/10 的資料挑出來的，這四天是「樣本內」，成績會偏好看；
+# 真正公平的比較要看 2026-10-12（下週一開盤）之後的表現。
+# 紀錄檔裡原本的「A」欄位就是 A-1（舊紀錄只追加不改，欄位名稱不動）。
+START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "B": ms(2026, 10, 6), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15)}
+ORDER = ["A", "A2", "B", "C", "D"]
+LABEL = {"A": "A-1", "A2": "A-2", "B": "B", "C": "C", "D": "D"}
+NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢", "D": "黃金中長趨勢"}
 
 # C 格合約與換月日（CME 慣例：到期前約一週的週四換到下一季）。過了最後一列要往下加
 C_CONTRACTS = [
@@ -354,6 +360,7 @@ def equity(rows, B, start):
     return out
 
 def draw_curves(res, path):
+    if not res: return
     """績效成長曲線：每格一張，各用自己的單位；圓點＝目前合計"""
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt, matplotlib.dates as mdates
@@ -370,7 +377,7 @@ def draw_curves(res, path):
         ax.plot(xs, ys, color=LINE, lw=1.6)
         ax.plot([xs[-1]], [tot], "o", ms=8, color=LINE, mec=BG, mew=2)
         ax.annotate(f"{tot:+,.0f}", (xs[-1], tot), xytext=(8, 0), textcoords="offset points", va="center", color=INK, fontsize=10)
-        ax.set_title(f"{k} {NAME[k]}　合計 {tot:+,.0f} {unit}（{totp:+.2f}%）", loc="left", color=INK, fontsize=11)
+        ax.set_title(f"{LABEL[k]} {NAME[k]}　合計 {tot:+,.0f} {unit}（{totp:+.2f}%）", loc="left", color=INK, fontsize=11)
         if b0 and b0 > eq[0][0]:  # 前段沒有 K 棒，只畫平倉階梯
             ax.axvspan(xs[0], D(b0), color=GRID, alpha=0.5, lw=0)
             ax.text(xs[0], 1.0, " 灰底：無 K 線，只在平倉時更新", transform=ax.get_xaxis_transform(), va="top", color=MUTED, fontsize=8.5)
@@ -399,8 +406,8 @@ if __name__ == "__main__":
     added += update("B", BB, posB, wB, "xyz:XYZ100"); LAST["B"] = (BB[-1][4], BB[-1][0], None)
 
     print("抓 A：QQQUSDT 逐筆成交（第一次較久）")
-    since = min(last_t("A", START["A"]), NOW) - 3 * 86400000
-    BA = bars_A(since); posA, wA = calc_rf(BA, 200, 23)
+    since = min(last_t("A", START["A"]), last_t("A2", START["A2"]), NOW) - 3 * 86400000
+    BA = bars_A(since); posA, wA = calc_rf(BA, 200, 23); posA2, wA2 = calc_rf(BA, 400, 16)
     ratio = [None]
     def nqconv(t, p):
         m = t // 60000 * 60000
@@ -410,6 +417,7 @@ if __name__ == "__main__":
         return p * (ratio[0] or 41.05)
     added += update("A", BA, posA, wA, "QQQUSDT", nqconv)
     LAST["A"] = (BA[-1][4], BA[-1][0], nqconv(BA[-1][0], BA[-1][4]))
+    added += update("A2", BA, posA2, wA2, "QQQUSDT", nqconv); LAST["A2"] = LAST["A"]
 
     print("抓 C：Yahoo 那斯達克單一月份合約")
     act = [c for c in C_CONTRACTS if c[2] is None or c[2] <= NOW][-1]
@@ -435,7 +443,7 @@ if __name__ == "__main__":
     BD = bars_D(min(last_t("D", START["D"]), NOW) - 70 * 86400000); posD, wD = calc_don(BD, 350, 8, "both", 8)
     added += update("D", BD, posD, wD, "XAUUSDT"); LAST["D"] = (BD[-1][4], BD[-1][0], None)
 
-    BARS = {"A": BA, "B": BB, "C": BC, "D": BD}
+    BARS = {"A": BA, "A2": BA, "B": BB, "C": BC, "D": BD}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
@@ -445,11 +453,13 @@ if __name__ == "__main__":
         print(f"  {r['格子']} {r['時間']} {r['動作']} @{r['換算那斯達克'] or r['價格']} {r['備註']}")
     print("\n========== 績效（未扣成本） ==========")
     curves = []
-    for k in "ABCD":
+    for k in ORDER:
+        if not any(r["格子"] == k for r in allrows):
+            print(f"{LABEL[k]} {NAME[k]}：尚未起算（{tpe(START[k])[:10]} 開盤起算）"); continue
         p = perf(k, [r for r in allrows if r["格子"] == k], *LAST[k])
         unit = "美元/盎司" if k == "D" else "點"
         tot_pts = p["pts"] + (p["op"]["pts"] if p["op"] else 0); tot_pct = p["pct"] + (p["op"]["pct"] if p["op"] else 0)
-        print(f"{k} {NAME[k]}（{tpe(START[k])[:10]} 起，資料到 {tpe(LAST[k][1])}）")
+        print(f"{LABEL[k]} {NAME[k]}（{tpe(START[k])[:10]} 起，資料到 {tpe(LAST[k][1])}）")
         print(f"   已平倉 {p['n']} 筆，賺 {p['win']}／賠 {p['n']-p['win']}，已實現 {p['pts']:+,.0f} {unit}（{p['pct']:+.2f}%）")
         if p["op"]:
             o = p["op"]; print(f"   持有中：{o['t']} 進場{o['side']} @{o['p']:,.2f}，現價 {o['now']:,.2f}，浮動 {o['pts']:+,.0f} {unit}（{o['pct']:+.2f}%）")
