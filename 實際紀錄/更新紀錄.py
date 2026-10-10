@@ -328,6 +328,62 @@ def perf(k, rows, last_price, last_t, nq_last=None):
         op = dict(side=SIDE[side], t=ent_t, p=ent_nq, now=nq_last or last_price, pts=g * ent_nq, pct=g * 100)
     return dict(n=n, win=win, pts=pts, pct=pct, op=op, trades=trades)
 
+def equity(rows, B, start):
+    """逐根 K 棒的「已實現＋浮動」。有 K 棒的期間每根都算；沒有 K 棒的期間只在平倉時跳一階（不猜中途浮動）。
+    算法與 perf 相同：A 格浮動＝價格漲跌 % × 進場換算點數。回傳 [(毫秒, 累計)]"""
+    b0 = B[0][0] if B else None
+    if B and rows and rows[-1]["動作"] == "換倉":  # 換倉前的 K 棒是舊約，不能用新約價格算浮動
+        b0 = max(b0, int(rows[-1]["時間戳"]))
+    items = sorted([(int(r["時間戳"]), 0, r) for r in rows] + [(b[0], 1, b) for b in B if b[0] >= max(start, b0 or 0)],
+                   key=lambda x: (x[0], x[1]))
+    side = 0; ent = en = None; real = 0.0; out = [(start, 0.0)]
+    items_b0 = next((t for t, kind, _ in items if kind == 1), None)
+    for t, kind, x in items:
+        if kind == 1:
+            if out[-1][0] < t and len(out) and t == items_b0: out.append((t, out[-1][1]))  # 無 K 棒區段平接，不畫斜線
+            out.append((t, real + ((x[4] / ent - 1) * side * en if side else 0))); continue
+        p = float(x["價格"]); pn = float(x["換算那斯達克"]) if x["換算那斯達克"] else p
+        ns = {"多": 1, "空": -1, "空手": 0}[x["部位"]]; before = real
+        if x["動作"] == "換倉":
+            old = float(x["備註"].split("舊約平倉 ")[1].split(" ")[0]); real += (old - ent) * side; ent = p; en = pn
+        else:
+            if side and ns != side: real += (p / ent - 1) * side * en
+            if ns != side: side = ns; ent = p if side else None; en = pn if side else None
+        if b0 is None or t < b0: out.append((t, before))  # 沒有 K 棒的期間畫成階梯
+        out.append((t, real))
+    return out
+
+def draw_curves(res, path):
+    """績效成長曲線：每格一張，各用自己的單位；圓點＝目前合計"""
+    import matplotlib; matplotlib.use("Agg")
+    import matplotlib.pyplot as plt, matplotlib.dates as mdates
+    plt.rcParams["font.family"] = ["Microsoft JhengHei"]; plt.rcParams["axes.unicode_minus"] = False
+    INK, MUTED, GRID, LINE, BG = "#1f1f1e", "#6b6a66", "#e6e5e1", "#2a78d6", "#fcfcfb"
+    TZ = timezone(timedelta(hours=8))
+    D = lambda t: datetime.fromtimestamp(t / 1000, TZ).replace(tzinfo=None)
+    fig, axs = plt.subplots(len(res), 1, figsize=(9, 2.6 * len(res)), facecolor=BG)
+    for ax, (k, unit, tot, totp, last_t, eq, b0) in zip(axs, res):
+        eq = eq + [(last_t, tot)]
+        xs = [D(t) for t, _ in eq]; ys = [v for _, v in eq]
+        ax.set_facecolor(BG)
+        ax.axhline(0, color=MUTED, lw=0.8)
+        ax.plot(xs, ys, color=LINE, lw=1.6)
+        ax.plot([xs[-1]], [tot], "o", ms=8, color=LINE, mec=BG, mew=2)
+        ax.annotate(f"{tot:+,.0f}", (xs[-1], tot), xytext=(8, 0), textcoords="offset points", va="center", color=INK, fontsize=10)
+        ax.set_title(f"{k} {NAME[k]}　合計 {tot:+,.0f} {unit}（{totp:+.2f}%）", loc="left", color=INK, fontsize=11)
+        if b0 and b0 > eq[0][0]:  # 前段沒有 K 棒，只畫平倉階梯
+            ax.axvspan(xs[0], D(b0), color=GRID, alpha=0.5, lw=0)
+            ax.text(xs[0], 1.0, " 灰底：無 K 線，只在平倉時更新", transform=ax.get_xaxis_transform(), va="top", color=MUTED, fontsize=8.5)
+        ax.grid(axis="y", color=GRID, lw=0.8); ax.set_axisbelow(True)
+        for s in ("top", "right"): ax.spines[s].set_visible(False)
+        for s in ("left", "bottom"): ax.spines[s].set_color(GRID)
+        ax.tick_params(colors=MUTED, labelsize=9)
+        if (eq[-1][0] - eq[0][0]) < 15 * 86400000: ax.xaxis.set_major_locator(mdates.DayLocator())
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
+        ax.margins(x=0.04)
+    fig.text(0.01, 0.003, "每根 K 線收盤的「已實現＋持有中浮動」，單位為點數（黃金：美元/盎司）。未扣手續費。", color=MUTED, fontsize=8.5)
+    fig.tight_layout(rect=(0, 0.015, 1, 1)); fig.savefig(path, dpi=130, facecolor=BG); plt.close(fig)
+
 # ============ 主程式 ============
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -379,6 +435,7 @@ if __name__ == "__main__":
     BD = bars_D(min(last_t("D", START["D"]), NOW) - 70 * 86400000); posD, wD = calc_don(BD, 350, 8, "both", 8)
     added += update("D", BD, posD, wD, "XAUUSDT"); LAST["D"] = (BD[-1][4], BD[-1][0], None)
 
+    BARS = {"A": BA, "B": BB, "C": BC, "D": BD}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
@@ -387,6 +444,7 @@ if __name__ == "__main__":
     for r in sorted(added, key=lambda r: int(r["時間戳"])):
         print(f"  {r['格子']} {r['時間']} {r['動作']} @{r['換算那斯達克'] or r['價格']} {r['備註']}")
     print("\n========== 績效（未扣成本） ==========")
+    curves = []
     for k in "ABCD":
         p = perf(k, [r for r in allrows if r["格子"] == k], *LAST[k])
         unit = "美元/盎司" if k == "D" else "點"
@@ -398,6 +456,10 @@ if __name__ == "__main__":
         else:
             print("   目前空手")
         print(f"   合計 {tot_pts:+,.0f} {unit}（{tot_pct:+.2f}%）")
+        rk = [r for r in allrows if r["格子"] == k]; eq = equity(rk, BARS[k], START[k])
+        curves.append((k, unit, tot_pts, tot_pct, LAST[k][1], eq, BARS[k][0][0]))
         print("   逐筆明細（# 方向 進場時間 進場價 → 出場時間 出場價 盈虧 % 累計）")
         for i, (sd, et, ep, xt, xp, g, gp, cum) in enumerate(p["trades"], 1):
             print(f"   {i:>2} {sd} {et} {ep:,.2f} → {xt} {xp:,.2f}  {g:+,.0f}（{gp:+.2f}%） 累計 {cum:+,.0f}")
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), "績效曲線.png")
+    draw_curves(curves, out); print(f"\n績效曲線圖：{out}")
