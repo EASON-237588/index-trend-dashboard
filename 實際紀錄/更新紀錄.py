@@ -34,7 +34,7 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 # 注意：A-2 的參數是用 10/6～10/10 的資料挑出來的，這四天是「樣本內」，成績會偏好看；
 # 真正公平的比較要看 2026-10-12（下週一開盤）之後的表現。
 # 紀錄檔裡原本的「A」欄位就是 A-1（舊紀錄只追加不改，欄位名稱不動）。
-START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "B": ms(2026, 10, 6), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15)}
+START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15)}
 ORDER = ["A", "A2", "B", "C", "D"]
 LABEL = {"A": "A-1", "A2": "A-2", "B": "B", "C": "C", "D": "D"}
 NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢", "D": "黃金中長趨勢"}
@@ -154,7 +154,7 @@ def bars_B():
     d = jget("https://api.hyperliquid.xyz/info", json.dumps({"type": "candleSnapshot", "req": {
         "coin": "xyz:XYZ100", "interval": "1m", "startTime": st, "endTime": NOW}}).encode())
     return [(x["t"], float(x["o"]), float(x["h"]), float(x["l"]), float(x["c"]), float(x["v"]))
-            for x in d if x["t"] + 60000 <= NOW]
+            for x in d if x["t"] + 60000 <= NOW and cme_open(x["t"])]  # 跟儀表板一樣剔除休市時段（2026-10-11 補上，之前週末也在算）
 
 def yahoo(sym, iv, rng):
     u = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval={iv}&range={rng}"
