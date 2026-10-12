@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.5.1</title>
+<title>指數趨勢儀表板 v1.5.2</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -119,7 +119,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.5.1";
+const VERSION = "v1.5.2";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -533,6 +533,31 @@ async function forwardTrades(sym, toId, onProg){
     await sleep(800);
   }
 }
+/* v1.5.2：Binance aggTrades 依編號往回查只給最近 2 天（再往前回 400「Search window is restricted
+   to recent 2 days only」）。週末過後 2 天內的交易時段湊不滿 3,600 根，整格就失敗。
+   更早的部分改讀 data.binance.vision 的每日逐筆檔（允許跨網域；與 實際紀錄/更新紀錄.py 同一份資料）。
+   zip 只有一個檔：從中央目錄讀壓縮後長度，再用瀏覽器內建的 DecompressionStream 解 deflate。 */
+async function dailyTrades(sym, day){
+  const r = await fetch(`https://data.binance.vision/data/futures/um/daily/aggTrades/${sym}/${sym}-aggTrades-${day}.zip`);
+  if(!r.ok) return null;
+  const buf = new Uint8Array(await r.arrayBuffer()), dv = new DataView(buf.buffer);
+  let e = buf.length - 22;
+  while(e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if(e < 0) return null;
+  const cd = dv.getUint32(e + 16, true);
+  const method = dv.getUint16(cd + 10, true), csize = dv.getUint32(cd + 20, true), lho = dv.getUint32(cd + 42, true);
+  const start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+  let data = buf.subarray(start, start + csize);
+  if(method === 8)
+    data = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+  const out = [];
+  for(const line of new TextDecoder().decode(data).split("\n")){
+    const c = line.split(",");
+    if(c.length < 6 || !/^\d/.test(c[0])) continue;   // 跳過標題列
+    out.push({a:+c[0], p:c[1], q:c[2], T:+c[5]});
+  }
+  return out;
+}
 async function load30(sym){
   const label = "那斯達克 30 秒";
   const latest = await latestAggId(sym);
@@ -547,7 +572,9 @@ async function load30(sym){
     const chunks = [], buckets = new Set();
     let from = latest - 999;
     for(let guard = 0; guard < 160 && from >= 0; guard++){
-      const ch = await jget(`${FAPI}/aggTrades?symbol=${sym}&fromId=${from}&limit=1000`);
+      let ch;
+      try{ ch = await jget(`${FAPI}/aggTrades?symbol=${sym}&fromId=${from}&limit=1000`); }
+      catch(e){ if(chunks.length) break; throw e; }   // 超出 2 天查不到：改由下面的每日檔補
       if(!ch.length) break;
       chunks.push(ch);
       for(const tr of ch) if(cmeOpen(tr.T)) buckets.add(Math.floor(tr.T/30000));
@@ -557,7 +584,25 @@ async function load30(sym){
       from -= 1000;
       await sleep(800);   // aggTrades 每次權重 20，壓在每分鐘上限 2,400 以內
     }
+    // 還不夠：從介面查到的最早那天往前，一天一天讀每日檔，最多回溯 7 天
+    const days = [];
+    if(buckets.size < NEED30 && chunks.length){
+      const oldestId = chunks[chunks.length-1][0].a;
+      let d = new Date(chunks[chunks.length-1][0].T);
+      for(let k = 0; k < 7 && buckets.size < NEED30 * 1.05; k++){
+        const day = d.toISOString().slice(0, 10);
+        setLoad("t30", buckets.size / NEED30, `${label} 讀 ${day} 每日成交檔`);
+        const tr = await dailyTrades(sym, day).catch(() => null);
+        if(tr){
+          const keep = tr.filter(x => x.a < oldestId);
+          days.unshift(keep);
+          for(const x of keep) if(cmeOpen(x.T)) buckets.add(Math.floor(x.T/30000));
+        }
+        d = new Date(d.getTime() - 86400000);
+      }
+    }
     S30.bars = []; S30.lastId = null;
+    for(const tr of days.flat()) addTrade(tr);
     for(let c = chunks.length - 1; c >= 0; c--) for(const tr of chunks[c]) addTrade(tr);
     await forwardTrades(sym, latest);
   }
