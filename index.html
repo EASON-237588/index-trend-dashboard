@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.4.4</title>
-<meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號">
+<title>指數趨勢儀表板 v1.5.0</title>
+<meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -119,7 +119,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.4.4";
+const VERSION = "v1.5.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -300,6 +300,48 @@ function calcDon(B, P){
   }
   return {pos, avg:avgA, atr, look, exitN, hh, ll, all: sigs, sigs: sigs.filter(s => s.i >= look), warm: look};
 }
+/* v1.5.0：黃金上方策略專用，逐行對齊黃金儀表板 compute()（1 段、只做多）與 LINE 推播 donchian.js。
+   跟上面 calcDon 有兩處不同，所以不共用：
+   1. 停損後不把方向歸零，而是封鎖同方向，要先跌破出場線（方向離開多方）才接受下一次突破
+      （calcDon 停損後只要再突破就立刻重進；7/23 停損那筆就是會分歧的情況）
+   2. ATR 用 Wilder 版：前 n 根空白、第 n 根用簡單平均當種子 */
+function calcDonG(B, P){
+  const n = B.length;
+  const look = Math.max(20, Math.round(P.lookH * 60 / P.tfMin));
+  const exitN = Math.max(10, Math.round(look / 3));
+  const H = B.map(b => b.h), L = B.map(b => b.l);
+  const hh = rollMax(H, look), ll = rollMin(L, look), he = rollMax(H, exitN), le = rollMin(L, exitN);
+  const tr = B.map((b, i) => i ? Math.max(b.h - b.l, Math.abs(b.h - B[i-1].c), Math.abs(b.l - B[i-1].c)) : null);
+  const atr = new Array(n).fill(null);
+  if(n > P.atrLen){
+    let s = 0; for(let i = 1; i <= P.atrLen; i++) s += tr[i];
+    atr[P.atrLen] = s / P.atrLen;
+    for(let i = P.atrLen + 1; i < n; i++) atr[i] = (atr[i-1] * (P.atrLen - 1) + tr[i]) / P.atrLen;
+  }
+  const pos = new Array(n).fill(0), avgA = new Array(n).fill(null), sigs = [];
+  let dir = 0, side = 0, avg = null, blocked = 0;
+  for(let i = 0; i < n; i++){
+    const c = B[i].c;
+    if(i >= look){
+      if(c > hh[i]) dir = 1;
+      else if(c < ll[i]) dir = -1;
+      else if(dir === 1 && c < le[i]) dir = 0;
+      else if(dir === -1 && c > he[i]) dir = 0;
+    }
+    const a = atr[i];
+    if(a != null && a > 0){
+      if(blocked !== 0 && dir !== blocked) blocked = 0;
+      if(side !== 0 && (avg - c) * side >= P.stopAtr * a){
+        blocked = side; sigs.push({i, d:0, why:"停損"}); side = 0; avg = null;
+      }
+      if(side !== 0 && dir !== side){ sigs.push({i, d:0, why:"出場"}); side = 0; avg = null; }
+      if(side === 0 && dir > 0 && dir !== blocked){ side = 1; avg = c; sigs.push({i, d:1}); }
+    }
+    pos[i] = side; avgA[i] = avg;
+  }
+  const warm = look + P.atrLen;
+  return {pos, avg:avgA, atr, look, exitN, hh, ll, all: sigs, sigs: sigs.filter(s => s.i >= warm), warm};
+}
 
 /* ============ 面板設定（參數讀自 TradingView 版面 JuwDqkR0，2026-10-07） ============ */
 const PANELS = [
@@ -325,6 +367,13 @@ const PANELS = [
   {k:"gold8", pg:"long", title:"黃金", tf:"中長趨勢", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
    P:{lookH:350, mode:"both", stopAtr:8, atrLen:14, tfMin:8}},
+  /* v1.5.0 新增：黃金儀表板「上方」那組，也是 LINE 推播（V2.07 起）推的那組。
+     資料、K 線切法、算法都照黃金儀表板：Binance 現貨 PAXG、24 小時、從 1970 起算的 11 分桶、calcDonG。
+     現貨不在合約那條即時連線裡，改用每 20 秒輪詢（pollSpot）。 */
+  {k:"gold11", pg:"long", title:"黃金", tf:"中長趨勢・上方", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
+   nq:false, kind:"don", tfMin:11, span:1e9, flatCol:"#4cff00",
+   sub:"PAXG 現貨 11 分（24 小時）・Donchian 回看 350 小時（1,909 根）・只做多・停損 8 ATR・同黃金儀表板上方與 LINE 推播",
+   P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:11}},
 ];
 for(const p of PANELS){ p.bars = []; p.done = 0; p.R = null; p.view = {span:p.span, off:0}; p.hover = null; p.dirty = false; p.ready = false; }
 const PAN = k => PANELS.find(p => p.k === k);
@@ -374,17 +423,20 @@ async function jget(url, opt){
 const kl = k => ({t:+k[0], o:+k[1], h:+k[2], l:+k[3], c:+k[4], v:+k[5]});
 
 // 往回抓 1 分 K，直到交易時段內的分鐘數夠用
+// v1.5.0：spot＝改抓 Binance 現貨（每頁上限 1000）；allDay＝24 小時都算，不只算 CME 時段
+const SAPI = "https://data-api.binance.vision/api/v3";
 const RAW1M = {};
-async function loadKlines(sym, needMin, label){
+async function loadKlines(sym, needMin, label, spot = false, allDay = false){
   const rev = []; let end = null, sess = 0;
+  const base = spot ? SAPI : FAPI, lim = spot ? 1000 : 1500;
   for(let guard = 0; sess < needMin && guard < 120; guard++){
-    const raw = await jget(`${FAPI}/klines?symbol=${sym}&interval=1m&limit=1500` + (end ? `&endTime=${end}` : ""));
+    const raw = await jget(`${base}/klines?symbol=${sym}&interval=1m&limit=${lim}` + (end ? `&endTime=${end}` : ""));
     if(!Array.isArray(raw) || !raw.length) break;
     const ch = raw.map(kl);
-    for(let i = ch.length - 1; i >= 0; i--){ rev.push(ch[i]); if(cmeOpen(ch[i].t)) sess++; }
+    for(let i = ch.length - 1; i >= 0; i--){ rev.push(ch[i]); if(allDay || cmeOpen(ch[i].t)) sess++; }
     end = ch[0].t - 1;
     setLoad(sym, sess/needMin, `${label} ${Math.min(100, Math.round(sess/needMin*100))}%`);
-    if(ch.length < 1500) break;
+    if(ch.length < lim) break;
   }
   setLoad(sym, null);
   RAW1M[sym] = rev.reverse();
@@ -406,6 +458,24 @@ function aggSession(raw, tf){
     if(!cur || cur.t !== st){
       if(cur) out.push(cur);
       cur = {t:st, o:b.o, h:b.h, l:b.l, c:b.c, v:b.v, end:st + tf*60000};
+    }else{
+      if(b.h > cur.h) cur.h = b.h;
+      if(b.l < cur.l) cur.l = b.l;
+      cur.c = b.c; cur.v += b.v;
+    }
+  }
+  if(cur) out.push(cur);
+  return out;
+}
+/* v1.5.0：24 小時合成，時間桶從 1970 起算（Math.floor(t/ms)*ms），
+   跟黃金儀表板、LINE 推播的 11 分 K 切法一致，三邊的訊號時間才對得上。 */
+function aggAll(raw, tf){
+  const ms = tf * 60000, out = []; let cur = null;
+  for(const b of raw){
+    const st = Math.floor(b.t / ms) * ms;
+    if(!cur || cur.t !== st){
+      if(cur) out.push(cur);
+      cur = {t:st, o:b.o, h:b.h, l:b.l, c:b.c, v:b.v, end:st + ms};
     }else{
       if(b.h > cur.h) cur.h = b.h;
       if(b.l < cur.l) cur.l = b.l;
@@ -582,7 +652,7 @@ function recompute(p){
     p.done = B.length && B[B.length-1].t + 30000 > now ? B.length - 1 : B.length;
   }else{
     const raw = RAW1M[p.sym]; if(!raw) return;
-    B = aggSession(raw, p.tfMin);
+    B = p.allDay ? aggAll(raw, p.tfMin) : aggSession(raw, p.tfMin);
     const now = Date.now(), last = B[B.length-1];
     // Yahoo 延遲 10 分鐘：時間到了不代表收完，要看原始 K 線有沒有涵蓋到這根的結尾
     const rawEnd = p.src === "yahoo" && raw.length ? raw[raw.length-1].t + 120000 : now;
@@ -590,7 +660,7 @@ function recompute(p){
   }
   p.bars = B;
   const done = B.slice(0, p.done);
-  p.R = p.kind === "rf" ? calcRF(done, p.P) : calcDon(done, p.P);
+  p.R = p.kind === "rf" ? calcRF(done, p.P) : p.goldExact ? calcDonG(done, p.P) : calcDon(done, p.P);
   p.ready = true;
   $("wait-" + p.k).hidden = true;
 }
@@ -909,7 +979,14 @@ async function loadDon(p, label){
      只抓「回看＋一點點」的話，會從半路開始算，進場點、停損線都跟 TradingView 對不上
      （v1.0.0 開發時實測：只抓 23 天，那斯達克 6 分錯過 9/18 的進場、黃金錯過 9/02 的翻空）。 */
   const look = Math.round(p.P.lookH * 60 / p.tfMin);
-  await loadKlines(p.sym, look * 3 * p.tfMin, label);
+  await loadKlines(p.sym, look * 3 * p.tfMin, label, !!p.spot, !!p.allDay);
+  p.dirty = true;
+}
+// v1.5.0：現貨（PAXG）不在合約即時連線裡，每 20 秒補最後幾根 1 分 K
+async function pollSpot(p){
+  if(!RAW1M[p.sym]) return;
+  const raw = await jget(`${SAPI}/klines?symbol=${p.sym}&interval=1m&limit=5`);
+  for(const k of raw) mergeKline(p.sym, kl(k));
   p.dirty = true;
 }
 async function main(){
@@ -919,6 +996,7 @@ async function main(){
     await Promise.all([
       loadDon(PAN("nq6"), "那斯達克 NQ 期貨"),
       loadDon(PAN("gold8"), "黃金 1 分 K"),
+      loadDon(PAN("gold11"), "黃金 PAXG 現貨").catch(e => { $("wait-gold11").textContent = "PAXG 現貨載入失敗：" + e.message + "，請重新整理"; }),
       loadHL(PAN("hl")).catch(e => { $("wait-hl").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
     ]);
   }catch(e){
@@ -934,6 +1012,7 @@ async function main(){
   // NQ 期貨沒有即時推送，每分鐘向中繼站重抓（中繼站本身也快取 60 秒）
   setInterval(() => { loadYahoo(PAN("nq6")).catch(() => {}); }, 60000);
   setInterval(() => { pollHL(PAN("hl")).catch(() => {}); }, 15000);
+  setInterval(() => { pollSpot(PAN("gold11")).catch(() => {}); }, 20000);
 }
 // 每秒把有新資料的面板重算重畫；斷線偵測也在這裡
 setInterval(() => {
