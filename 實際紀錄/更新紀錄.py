@@ -6,6 +6,8 @@
   B 那斯達克短趨勢・參考  Hyperliquid xyz:XYZ100 1 分，Range Filter 100/16，多空反轉
   C 那斯達克中長趨勢      Yahoo 那斯達克期貨「單一月份合約」6 分，Donchian 350 小時只做多＋8 ATR 停損
   D 黃金中長趨勢          Binance XAUUSDT 8 分，Donchian 350 小時多空反轉
+  G 那斯達克短趨勢・Gate  Gate QQQ_USDT 合約逐筆合成 30 秒，Range Filter 200/23（規則同 A-1，只換資料源；LINE 推播這組）
+                          2026-10-12 取代 A-2：A2 舊紀錄保留，之後不再更新
   E 黃金中長趨勢・上方    Binance 現貨 PAXGUSDT 11 分（24 小時），Donchian 350 小時只做多＋8 ATR 停損
                           （= 黃金儀表板上方、LINE 推播那組，算法照 index.html 的 calcDonG）
 
@@ -37,10 +39,11 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 # 真正公平的比較要看 2026-10-12（下週一開盤）之後的表現。
 # 紀錄檔裡原本的「A」欄位就是 A-1（舊紀錄只追加不改，欄位名稱不動）。
 # E（2026-10-12 加入）＝黃金上方策略，起算日比照 C、D。
-START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15), "E": ms(2026, 8, 15)}
-ORDER = ["A", "A2", "B", "C", "D", "E"]
-LABEL = {"A": "A-1", "A2": "A-2", "B": "B", "C": "C", "D": "D", "E": "E"}
-NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢", "D": "黃金中長趨勢", "E": "黃金中長趨勢・上方（只做多）"}
+# G（2026-10-12 加入，取代 A-2）＝Gate 版，起算日與 A-1 同為 10/6，方便並排比較。A2 舊列保留但不再更新、不再印績效。
+START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15), "E": ms(2026, 8, 15)}
+ORDER = ["A", "G", "B", "C", "D", "E"]
+LABEL = {"A": "A-1", "A2": "A-2", "G": "Gate", "B": "B", "C": "C", "D": "D", "E": "E"}
+NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢・Gate 資料（取樣 200、倍數 23）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢", "D": "黃金中長趨勢", "E": "黃金中長趨勢・上方（只做多）"}
 GOLD = ("D", "E")   # 單位是美元/盎司
 
 # C 格合約與換月日（CME 慣例：到期前約一週的週四換到下一季）。過了最後一列要往下加
@@ -150,6 +153,36 @@ def bars_A(since):
                     x += 30000
             B.append([t, p, p, p, p, q])
         elif t == B[-1][0]:
+            b = B[-1]; b[2] = max(b[2], p); b[3] = min(b[3], p); b[4] = p; b[5] += q
+    return [tuple(b) for b in B if b[0] + 30000 <= NOW]
+
+def bars_G(since):
+    """Gate QQQ_USDT 合約逐筆 → 30 秒 K，切法同 bars_A（CME 時段、空檔補平盤）。
+    Gate 原生 30 秒 K 只能回溯約 3.5 天，起算要回到 10/6，所以用逐筆（可回溯至少 30 天）。
+    注意：create_time_ms 名稱寫毫秒、實際是「秒」，一律用 create_time × 1000。"""
+    def page(a, b):
+        j = jget(f"https://api.gateio.ws/api/v4/futures/usdt/trades?contract=QQQ_USDT&limit=1000&from={a}&to={b}")
+        if len(j) >= 1000 and b - a > 10:
+            m = (a + b) // 2
+            return page(a, m) + page(m, b)
+        return j
+    tr = {}; t = since // 1000; end = NOW // 1000
+    while t < end:
+        for x in page(t, min(end, t + 900)):
+            tr[x["id"]] = (int(float(x["create_time"]) * 1000), float(x["price"]), abs(float(x["size"])))
+        t += 900
+    B = []
+    for T, p, q in sorted(tr.values()):
+        if T < since or not cme_open(T): continue
+        s = T // 30000 * 30000
+        if not B or s > B[-1][0]:
+            if B and s - B[-1][0] <= 2 * 3600000:
+                c = B[-1][4]; x = B[-1][0] + 30000
+                while x < s:
+                    if cme_open(x): B.append([x, c, c, c, c, 0.0])
+                    x += 30000
+            B.append([s, p, p, p, p, q])
+        elif s == B[-1][0]:
             b = B[-1]; b[2] = max(b[2], p); b[3] = min(b[3], p); b[4] = p; b[5] += q
     return [tuple(b) for b in B if b[0] + 30000 <= NOW]
 
@@ -456,8 +489,8 @@ if __name__ == "__main__":
     added += update("B", BB, posB, wB, "xyz:XYZ100"); LAST["B"] = (BB[-1][4], BB[-1][0], None)
 
     print("抓 A：QQQUSDT 逐筆成交（第一次較久）")
-    since = min(last_t("A", START["A"]), last_t("A2", START["A2"]), NOW) - 3 * 86400000
-    BA = bars_A(since); posA, wA = calc_rf(BA, 200, 23); posA2, wA2 = calc_rf(BA, 400, 16)
+    since = min(last_t("A", START["A"]), NOW) - 3 * 86400000
+    BA = bars_A(since); posA, wA = calc_rf(BA, 200, 23)
     ratio = [None]
     def nqconv(t, p):
         m = t // 60000 * 60000
@@ -467,7 +500,12 @@ if __name__ == "__main__":
         return p * (ratio[0] or 41.05)
     added += update("A", BA, posA, wA, "QQQUSDT", nqconv)
     LAST["A"] = (BA[-1][4], BA[-1][0], nqconv(BA[-1][0], BA[-1][4]))
-    added += update("A2", BA, posA2, wA2, "QQQUSDT", nqconv); LAST["A2"] = LAST["A"]
+    # A2 自 2026-10-12 起不再更新（由 G 取代），舊列保留
+
+    print("抓 G：Gate QQQ_USDT 逐筆成交（第一次較久）")
+    BG = bars_G(min(last_t("G", START["G"]), NOW) - 3 * 86400000); posG, wG = calc_rf(BG, 200, 23)
+    added += update("G", BG, posG, wG, "QQQ_USDT", nqconv)
+    LAST["G"] = (BG[-1][4], BG[-1][0], nqconv(BG[-1][0], BG[-1][4]))
 
     print("抓 C：Yahoo 那斯達克單一月份合約")
     act = [c for c in C_CONTRACTS if c[2] is None or c[2] <= NOW][-1]
@@ -497,7 +535,7 @@ if __name__ == "__main__":
     BE = bars_E(min(last_t("E", START["E"]), NOW) - 70 * 86400000); posE, wE = calc_don_g(BE)
     added += update("E", BE, posE, wE, "PAXGUSDT"); LAST["E"] = (BE[-1][4], BE[-1][0], None)
 
-    BARS = {"A": BA, "A2": BA, "B": BB, "C": BC, "D": BD, "E": BE}
+    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
