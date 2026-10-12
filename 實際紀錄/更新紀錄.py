@@ -6,12 +6,14 @@
   B 那斯達克短趨勢・參考  Hyperliquid xyz:XYZ100 1 分，Range Filter 100/16，多空反轉
   C 那斯達克中長趨勢      Yahoo 那斯達克期貨「單一月份合約」6 分，Donchian 350 小時只做多＋8 ATR 停損
   D 黃金中長趨勢          Binance XAUUSDT 8 分，Donchian 350 小時多空反轉
+  E 黃金中長趨勢・上方    Binance 現貨 PAXGUSDT 11 分（24 小時），Donchian 350 小時只做多＋8 ATR 停損
+                          （= 黃金儀表板上方、LINE 推播那組，算法照 index.html 的 calcDonG）
 
 紀錄規則
 - 只往後追加，不改舊列。舊列就是當時的實際紀錄，日後資料源修正也不回頭改。
 - C 格用單一月份合約算訊號與損益，不用連續月（連續月換月時有價差，回測會失真）。
   換月日如果有部位，記一筆「換倉」：舊約平倉、新約同時開倉，價差照實算進損益。
-- 起算日：A、B 從 2026-10-06，C、D 從 2026-08-15。起算當下已有的部位，以起算時的價格記「起算持有」。
+- 起算日：A、B 從 2026-10-06，C、D、E 從 2026-08-15。起算當下已有的部位，以起算時的價格記「起算持有」。
 - 價格是訊號那根 K 棒的收盤價，未扣手續費與滑價。
 
 只用 Python 內建模組，三台電腦都能直接跑。
@@ -34,10 +36,12 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 # 注意：A-2 的參數是用 10/6～10/10 的資料挑出來的，這四天是「樣本內」，成績會偏好看；
 # 真正公平的比較要看 2026-10-12（下週一開盤）之後的表現。
 # 紀錄檔裡原本的「A」欄位就是 A-1（舊紀錄只追加不改，欄位名稱不動）。
-START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15)}
-ORDER = ["A", "A2", "B", "C", "D"]
-LABEL = {"A": "A-1", "A2": "A-2", "B": "B", "C": "C", "D": "D"}
-NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢", "D": "黃金中長趨勢"}
+# E（2026-10-12 加入）＝黃金上方策略，起算日比照 C、D。
+START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15), "E": ms(2026, 8, 15)}
+ORDER = ["A", "A2", "B", "C", "D", "E"]
+LABEL = {"A": "A-1", "A2": "A-2", "B": "B", "C": "C", "D": "D", "E": "E"}
+NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢", "D": "黃金中長趨勢", "E": "黃金中長趨勢・上方（只做多）"}
+GOLD = ("D", "E")   # 單位是美元/盎司
 
 # C 格合約與換月日（CME 慣例：到期前約一週的週四換到下一季）。過了最後一列要往下加
 C_CONTRACTS = [
@@ -184,6 +188,24 @@ def bars_D(since):
         if len(ch) < 1500: break
     return agg_session(out, 8)
 
+def bars_E(since):
+    """Binance 現貨 PAXGUSDT 1 分 → 11 分（24 小時，時間桶從 1970 起算，同儀表板 aggAll）。只留已收盤的 K。"""
+    out = []; st = since
+    while st < NOW:
+        ch = jget(f"https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=1m&limit=1000&startTime={st}")
+        if not ch: break
+        out += [(int(k[0]), float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])) for k in ch]
+        st = int(ch[-1][0]) + 60000
+        if len(ch) < 1000: break
+    ms11 = 11 * 60000; B = []
+    for t, o, h, l, c, v in out:
+        s = t // ms11 * ms11
+        if B and B[-1][0] == s:
+            _, o0, h0, l0, _, v0 = B[-1]; B[-1] = (s, o0, max(h0, h), min(l0, l), c, v0 + v)
+        else: B.append((s, o, h, l, c, v))
+    while B and B[-1][0] + ms11 > NOW: B.pop()
+    return B
+
 # ============ 指標（照 index.html 逐行移植） ============
 def pine_ma(src, n, alpha):
     out = [None] * len(src); prev = None; s = 0.0; cnt = 0
@@ -264,6 +286,34 @@ def calc_don(B, lookH, tf, mode, stop_atr, atr_len=14):
         if flip: side = d; avg = c
         pos[i] = side
     return pos, look
+
+def calc_don_g(B, lookH=350, tf=11, stop_atr=8, atr_len=14):
+    """E 格：照 index.html 的 calcDonG（＝黃金儀表板 compute、LINE 推播 donchian.js）。
+    與 calc_don 不同處：停損後封鎖同方向、要先跌破出場線才接受下一次突破；ATR 用 Wilder（第 n 根簡單平均當種子）。"""
+    n = len(B); look = max(20, round(lookH * 60 / tf)); exn = max(10, round(look / 3))
+    H = [b[2] for b in B]; L = [b[3] for b in B]
+    hh, ll, he, le = roll(H, look, True), roll(L, look, False), roll(H, exn, True), roll(L, exn, False)
+    tr = [None] + [max(B[i][2] - B[i][3], abs(B[i][2] - B[i-1][4]), abs(B[i][3] - B[i-1][4])) for i in range(1, n)]
+    atr = [None] * n
+    if n > atr_len:
+        atr[atr_len] = sum(tr[1:atr_len + 1]) / atr_len
+        for i in range(atr_len + 1, n): atr[i] = (atr[i-1] * (atr_len - 1) + tr[i]) / atr_len
+    pos = [0] * n; d = side = blocked = 0; avg = None
+    for i in range(n):
+        c = B[i][4]
+        if i >= look:
+            if c > hh[i]: d = 1
+            elif c < ll[i]: d = -1
+            elif d == 1 and c < le[i]: d = 0
+            elif d == -1 and c > he[i]: d = 0
+        a = atr[i]
+        if a is not None and a > 0:
+            if blocked and d != blocked: blocked = 0
+            if side and (avg - c) * side >= stop_atr * a: blocked = side; side = 0; avg = None
+            if side and d != side: side = 0; avg = None
+            if not side and d > 0 and d != blocked: side = 1; avg = c
+        pos[i] = side
+    return pos, look + atr_len
 
 # ============ 紀錄 ============
 def load_log():
@@ -443,7 +493,11 @@ if __name__ == "__main__":
     BD = bars_D(min(last_t("D", START["D"]), NOW) - 70 * 86400000); posD, wD = calc_don(BD, 350, 8, "both", 8)
     added += update("D", BD, posD, wD, "XAUUSDT"); LAST["D"] = (BD[-1][4], BD[-1][0], None)
 
-    BARS = {"A": BA, "A2": BA, "B": BB, "C": BC, "D": BD}
+    print("抓 E：Binance 現貨 PAXGUSDT 1 分 K")
+    BE = bars_E(min(last_t("E", START["E"]), NOW) - 70 * 86400000); posE, wE = calc_don_g(BE)
+    added += update("E", BE, posE, wE, "PAXGUSDT"); LAST["E"] = (BE[-1][4], BE[-1][0], None)
+
+    BARS = {"A": BA, "A2": BA, "B": BB, "C": BC, "D": BD, "E": BE}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
@@ -457,7 +511,7 @@ if __name__ == "__main__":
         if not any(r["格子"] == k for r in allrows):
             print(f"{LABEL[k]} {NAME[k]}：尚未起算（{tpe(START[k])[:10]} 開盤起算）"); continue
         p = perf(k, [r for r in allrows if r["格子"] == k], *LAST[k])
-        unit = "美元/盎司" if k == "D" else "點"
+        unit = "美元/盎司" if k in GOLD else "點"
         tot_pts = p["pts"] + (p["op"]["pts"] if p["op"] else 0); tot_pct = p["pct"] + (p["op"]["pct"] if p["op"] else 0)
         print(f"{LABEL[k]} {NAME[k]}（{tpe(START[k])[:10]} 起，資料到 {tpe(LAST[k][1])}）")
         print(f"   已平倉 {p['n']} 筆，賺 {p['win']}／賠 {p['n']-p['win']}，已實現 {p['pts']:+,.0f} {unit}（{p['pct']:+.2f}%）")
