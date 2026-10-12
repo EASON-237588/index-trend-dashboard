@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.5.0</title>
+<title>指數趨勢儀表板 v1.5.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -119,7 +119,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.5.0";
+const VERSION = "v1.5.1";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -371,7 +371,9 @@ const PANELS = [
      資料、K 線切法、算法都照黃金儀表板：Binance 現貨 PAXG、24 小時、從 1970 起算的 11 分桶、calcDonG。
      現貨不在合約那條即時連線裡，改用每 20 秒輪詢（pollSpot）。 */
   {k:"gold11", pg:"long", title:"黃金", tf:"中長趨勢・上方", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
-   nq:false, kind:"don", tfMin:11, span:1e9, flatCol:"#4cff00",
+   /* v1.5.1：畫面跟黃金儀表板上方一樣顯示最近 12,000 根（約 92 天）；
+      多抓 2,200 根給回看 1,909 根＋ATR 暖機，起點的持倉狀態才對 */
+   nq:false, kind:"don", tfMin:11, span:12000, needBars:14200, flatCol:"#4cff00",
    sub:"PAXG 現貨 11 分（24 小時）・Donchian 回看 350 小時（1,909 根）・只做多・停損 8 ATR・同黃金儀表板上方與 LINE 推播",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:11}},
 ];
@@ -429,7 +431,8 @@ const RAW1M = {};
 async function loadKlines(sym, needMin, label, spot = false, allDay = false){
   const rev = []; let end = null, sess = 0;
   const base = spot ? SAPI : FAPI, lim = spot ? 1000 : 1500;
-  for(let guard = 0; sess < needMin && guard < 120; guard++){
+  const maxPages = Math.max(120, Math.ceil(needMin / lim) + 5);   // v1.5.1：黃金上方要 15 萬根 1 分 K，120 頁不夠
+  for(let guard = 0; sess < needMin && guard < maxPages; guard++){
     const raw = await jget(`${base}/klines?symbol=${sym}&interval=1m&limit=${lim}` + (end ? `&endTime=${end}` : ""));
     if(!Array.isArray(raw) || !raw.length) break;
     const ch = raw.map(kl);
@@ -979,7 +982,8 @@ async function loadDon(p, label){
      只抓「回看＋一點點」的話，會從半路開始算，進場點、停損線都跟 TradingView 對不上
      （v1.0.0 開發時實測：只抓 23 天，那斯達克 6 分錯過 9/18 的進場、黃金錯過 9/02 的翻空）。 */
   const look = Math.round(p.P.lookH * 60 / p.tfMin);
-  await loadKlines(p.sym, look * 3 * p.tfMin, label, !!p.spot, !!p.allDay);
+  const needMin = p.needBars ? p.needBars * p.tfMin : look * 3 * p.tfMin;
+  await loadKlines(p.sym, needMin, label, !!p.spot, !!p.allDay);
   p.dirty = true;
 }
 // v1.5.0：現貨（PAXG）不在合約即時連線裡，每 20 秒補最後幾根 1 分 K
