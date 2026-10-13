@@ -539,6 +539,10 @@ if __name__ == "__main__":
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
+    # 儀表板「交易明細」從這個時間之後用網頁即時資料接著算（2026-10-13 起）。
+    # 記倒數第二根（最後一根走完的 K 棒）：最後一根可能還在形成，部位之後還會變。
+    with open(os.path.join(HERE, "紀錄狀態.json"), "w", encoding="utf-8") as f:
+        json.dump({"算到": {k: BARS[k][-2][0] for k in ORDER}, "執行時間": NOW}, f, ensure_ascii=False)
 
     print(f"\n本次新增 {len(added)} 筆紀錄")
     for r in sorted(added, key=lambda r: int(r["時間戳"])):

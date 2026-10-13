@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.6.0</title>
+<title>指數趨勢儀表板 v1.7.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -49,7 +49,7 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 #stTxt{display:none}
 .status{flex:none;margin-left:auto}
 /* v1.4.3：曲線圖緊貼在中長趨勢右邊，燈號靠最右 */
-#curveBtn{margin-left:0}.dot.warn{background:var(--warn)}.dot.err{background:var(--long)}
+#tradeBtn{margin-left:0}.dot.warn{background:var(--warn)}.dot.err{background:var(--long)}
 .hbtn+.hbtn{margin-left:6px}
 .hbtn{margin-left:auto;flex:none;font-size:12px;color:var(--text);background:var(--panel);border:1px solid var(--line);
   border-radius:6px;padding:3px 10px;cursor:pointer}
@@ -91,6 +91,21 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
   border-radius:12px 12px 0 0;padding:12px 16px 20px;font-size:13px;line-height:1.7;color:var(--mute)}
 .sheet .top{display:flex;align-items:center;justify-content:space-between;color:var(--text);font-weight:700;margin-bottom:4px}
 .sheet li{margin:4px 0}
+/* v1.7.0 交易明細 */
+.tk{display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 8px}
+.tk button{font-size:12px;color:var(--mute);background:#0e121b;border:1px solid var(--line);border-radius:5px;padding:2px 9px;cursor:pointer}
+.tk button.on{color:#0b0e14;background:var(--tag);border-color:var(--tag);font-weight:700}
+.tsum{color:var(--text);font-size:12px;line-height:1.6;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.tsum .tot{font-size:16px;font-weight:700}
+.tnote{font-size:11px;color:var(--mute);line-height:1.5;margin:2px 0 6px}
+.tnote.warn{color:var(--warn)}
+.tt{width:100%;border-collapse:collapse;font-size:11.5px;line-height:1.35;color:var(--text);font-variant-numeric:tabular-nums}
+.tt th{font-weight:400;color:var(--mute);text-align:right;padding:3px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tt td{text-align:right;padding:4px 3px;border-bottom:1px solid #1b2130;white-space:nowrap;vertical-align:top}
+.tt th:nth-child(-n+2),.tt td:nth-child(-n+2){text-align:center}
+.tt small{color:var(--mute);font-size:10.5px}
+.tt tr.live td:first-child{color:var(--tag)}
+.tt tr.hold td{background:rgba(34,199,232,.07)}
 </style>
 </head>
 <body>
@@ -98,19 +113,19 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 <header>
   <h1>指數趨勢儀表板<small id="ver"></small></h1>
   <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="long">中長趨勢</button></div>
-  <button class="hbtn" id="curveBtn">曲線圖</button>
+  <button class="hbtn" id="tradeBtn">交易明細</button>
   <div class="status"><i class="dot" id="dot"></i><span id="stTxt">準備中</span></div>
 </header>
 <div class="loadbar" id="loadBar" hidden><div class="fill" id="loadFill"></div><span id="loadTxt"></span></div>
 <main class="grid" id="grid"></main>
 </div>
 
-<!-- v1.4.1：績效曲線圖，由 實際紀錄/更新紀錄.py 每次開工時重畫 -->
-<div class="sheet" id="curveSheet" hidden>
+<!-- v1.7.0：曲線圖改成交易明細（使用者 2026-10-13 要求），開著時每秒更新 -->
+<div class="sheet" id="tradeSheet" hidden>
   <div class="in">
-    <div class="top">績效曲線（實際紀錄）<button class="hbtn" id="curveClose">關閉</button></div>
-    <div id="curveNote" style="font-size:11px;margin-bottom:6px">每次開工跑紀錄時更新・已實現＋持有中浮動・未扣手續費</div>
-    <img id="curveImg" alt="績效曲線圖" style="display:block;width:100%;border-radius:6px;background:#fafaf8">
+    <div class="top">交易明細<button class="hbtn" id="tradeClose">關閉</button></div>
+    <div class="tk" id="tradeTabs"></div>
+    <div id="tradeBody"></div>
   </div>
 </div>
 
@@ -119,7 +134,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.6.0";
+const VERSION = "v1.7.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -743,14 +758,18 @@ function buildDOM(){
       <div class="wait" id="wait-${p.k}">載入中…</div>
     </div>
   </section>`).join("");
-  $("curveBtn").onclick = () => {
-    $("curveImg").hidden = false;
-    $("curveImg").src = "實際紀錄/績效曲線.png?t=" + Date.now();   // 每次開都抓最新的圖
-    $("curveSheet").hidden = false;
+  $("tradeTabs").innerHTML = TRADE_K.map(T => `<button data-k="${T.k}">${T.name}</button>`).join("");
+  $("tradeTabs").onclick = e => {
+    const k = e.target.dataset && e.target.dataset.k; if(!k) return;
+    tradeK = k; try{ localStorage.setItem("itd-trade-k", k); }catch(err){}
+    tradeSig = ""; renderTrades();
   };
-  $("curveImg").onerror = () => { $("curveImg").hidden = true; $("curveNote").textContent = "還沒有曲線圖：開工跑一次實際紀錄後才會產生"; };
-  $("curveClose").onclick = () => { $("curveSheet").hidden = true; };
-  $("curveSheet").onclick = e => { if(e.target.id === "curveSheet") $("curveSheet").hidden = true; };
+  $("tradeBtn").onclick = () => {
+    $("tradeSheet").hidden = false; tradeSig = ""; renderTrades();
+    if(!LOGROWS || Date.now() - logAt > 60000) loadLog();   // 每次打開都重讀正式紀錄（一分鐘內不重複）
+  };
+  $("tradeClose").onclick = () => { $("tradeSheet").hidden = true; };
+  $("tradeSheet").onclick = e => { if(e.target.id === "tradeSheet") $("tradeSheet").hidden = true; };
   for(const p of PANELS) bindChart(p);
   document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => showPage(b.dataset.pg));
   let pg = "short"; try{ pg = localStorage.getItem(PAGE_KEY) || "short"; }catch(e){}
@@ -816,6 +835,149 @@ function renderInfo(p){
   if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, `<b>${durText(Date.now() - e.t)}</b>`);
   parts.push(`${trigK} <b>${trig}</b>`);
   $("kv-" + p.k).innerHTML = parts.join(" · ");
+}
+
+/* ============ v1.7.0 交易明細（取代曲線圖；使用者 2026-10-13 要求「只要有交易就自動更新」） ============
+   底稿是 實際紀錄/進出紀錄.csv（開工時 更新紀錄.py 寫的正式紀錄）。最後一筆之後，用這一頁即時算出的
+   部位接著補（標「◆」），接法照 update()：先比對交界那根部位、不同就記校正，再逐根找部位改變。
+   盈虧逐行照 perf()：盈虧＝漲跌 %×進場時的那斯達克點數，換倉讀備註的舊約平倉價，總 % 是逐筆相加。
+   即時那幾筆可能跟正式紀錄差幾點（C 格網頁用連續月 NQ=F、紀錄用單一月份合約；Gate 網頁用原生 30 秒 K、
+   紀錄用逐筆合成），下次開工跑紀錄後以正式紀錄為準。 */
+const TRADE_K = [
+  {k:"A", pk:"rf",     name:"A-1",  unit:"點"},
+  {k:"G", pk:"gate",   name:"Gate", unit:"點"},
+  {k:"B", pk:"hl",     name:"B",    unit:"點"},
+  {k:"C", pk:"nq6",    name:"C",    unit:"點"},
+  {k:"D", pk:"gold8",  name:"D 黃金", unit:"美元", d:2},
+  {k:"E", pk:"gold11", name:"E 黃金", unit:"美元", d:2},
+];
+const SIDE_N = {"多":1, "空":-1, "空手":0}, SIDE_T = {1:"多", "-1":"空", 0:"空手"};
+let LOGROWS = null, LOGCOVER = {}, logAt = 0, logErr = "", logBusy = false, tradeK = "A", tradeSig = "";
+try{ tradeK = localStorage.getItem("itd-trade-k") || "A"; }catch(e){}
+function parseCSV(txt){
+  const out = []; let row = [], f = "", q = false;
+  txt = txt.replace(/^﻿/, "");
+  for(let i = 0; i < txt.length; i++){
+    const ch = txt[i];
+    if(q){ if(ch === '"'){ if(txt[i+1] === '"'){ f += '"'; i++; } else q = false; } else f += ch; }
+    else if(ch === '"') q = true;
+    else if(ch === ","){ row.push(f); f = ""; }
+    else if(ch === "\n" || ch === "\r"){
+      if(ch === "\r" && txt[i+1] === "\n") i++;
+      row.push(f); f = ""; if(row.length > 1) out.push(row); row = [];
+    }else f += ch;
+  }
+  if(f || row.length){ row.push(f); if(row.length > 1) out.push(row); }
+  const head = out.shift() || [];
+  return out.map(r => Object.fromEntries(head.map((h, i) => [h, r[i] || ""])));
+}
+async function loadLog(){
+  if(logBusy) return; logBusy = true;
+  try{
+    const r = await fetch("實際紀錄/進出紀錄.csv?t=" + Date.now(), {cache:"no-store"});
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    LOGROWS = parseCSV(await r.text()).map(x => ({k:x["格子"], t:+x["時間戳"], act:x["動作"], side:SIDE_N[x["部位"]],
+      p:+x["價格"], nq:x["換算那斯達克"] ? +x["換算那斯達克"] : null, note:x["備註"]})).sort((a, b) => a.t - b.t);
+    logAt = Date.now(); logErr = "";
+    // 紀錄程式每次跑完寫「各組算到幾點」：那之前它已確認沒有新交易，網頁從那之後接著算
+    try{ const s = await fetch("實際紀錄/紀錄狀態.json?t=" + Date.now(), {cache:"no-store"}); LOGCOVER = s.ok ? (await s.json())["算到"] || {} : {}; }
+    catch(e){ LOGCOVER = {}; }
+  }catch(e){ logErr = "讀不到進出紀錄：" + (e.message || e); }
+  logBusy = false; tradeSig = ""; renderTrades();
+}
+function tradesOf(T){
+  const p = PAN(T.pk), rows = LOGROWS.filter(r => r.k === T.k).map(r => Object.assign({}, r));
+  // 換算那斯達克點數：照 更新紀錄.py 的 nqconv，用當時那一分鐘（往前找 30 分鐘內）的 Hyperliquid 收盤÷當根價格，
+  // 找不到才用現在的比例。用現在的比例會跟正式紀錄差 10 點以上（盈虧點數不受影響，算法是漲跌 %×進場點數）。
+  const hl = RAW1M["xyz:XYZ100"] || [];
+  const hlAt = t => {
+    const m = Math.floor(t / 60000) * 60000;
+    for(let k = hl.length - 1; k >= 0 && hl[k].t > m - 30 * 60000; k--) if(hl[k].t <= m) return hl[k].c;
+    return null;
+  };
+  const conv = (v, t) => { if(!p.nq) return v; const h = t != null ? hlAt(t) : null; return h ? h : v * RATIO; };
+  // 那斯達克兩格要等換算比例出來，不然即時那幾筆會用 QQQ 原價
+  const ready = p.ready && p.R && p.done > 0 && (!p.nq || RATIO);
+  let gap = false;
+  if(ready && rows.length){
+    const B = p.bars, pos = p.R.pos, n = p.done, lo = p.R.warm;
+    const from = Math.max(rows[rows.length-1].t, LOGCOVER[T.k] || 0);
+    let cur = rows[rows.length-1].side, s = B.findIndex(b => b.t > from);
+    if(s < 0 || s > n) s = n;
+    if(s < lo){ gap = true; s = lo; }   // 正式紀錄之後的缺口比網頁抓到的資料還長，中間可能漏
+    const add = (i, side, note) => rows.push({k:T.k, t:B[i].t, act:"", side, p:B[i].c, nq:p.nq ? conv(B[i].c, B[i].t) : null, note, live:true});
+    const j = s - 1;
+    if(j >= lo && j < n && pos[j] !== cur){ add(s < n ? s : j, pos[j], "校正"); cur = pos[j]; }
+    for(let i = s; i < n; i++) if(pos[i] !== cur){ add(i, pos[i], ""); cur = pos[i]; }
+  }
+  let pts = 0, pct = 0, cnt = 0, win = 0, side = 0, ent = null, entNq = null, entT = null, entLive = false;
+  const trades = [];
+  for(const r of rows){
+    const pn = r.nq != null ? r.nq : r.p;
+    if(r.act === "換倉"){   // 舊約平倉價寫在備註
+      const m = /舊約平倉 ([\d.]+)/.exec(r.note), old = m ? +m[1] : r.p, g = (old - ent) * side;
+      pts += g; pct += g / ent * 100; cnt++; win += g > 0;
+      trades.push({side, et:entT, ep:entNq, xt:r.t, xp:old, g, gp:g / ent * 100, cum:pts, roll:true, live:entLive || !!r.live});
+      ent = r.p; entNq = pn; entT = r.t; entLive = !!r.live; continue;
+    }
+    if(side !== 0 && r.side !== side){
+      const g = (r.p / ent - 1) * side; pts += g * entNq; pct += g * 100; cnt++; win += g > 0;
+      trades.push({side, et:entT, ep:entNq, xt:r.t, xp:pn, g:g * entNq, gp:g * 100, cum:pts, live:!!r.live, fix:r.note === "校正"});
+    }
+    if(r.side !== side){ side = r.side; ent = side ? r.p : null; entNq = side ? pn : null; entT = side ? r.t : null; entLive = !!r.live; }
+  }
+  let op = null;
+  if(side){
+    op = {side, t:entT, p:entNq, live:entLive};
+    if(ready){
+      const L = p.bars[p.bars.length-1], g = (L.c / ent - 1) * side;
+      Object.assign(op, {now:conv(L.c, L.t), pts:g * entNq, pct:g * 100});
+    }
+  }
+  return {cnt, win, pts, pct, op, trades, gap, ready, upTo:ready ? p.bars[p.bars.length-1].t : null, first:ready ? (p.bars[p.R.warm] || p.bars[p.bars.length-1]) : null};
+}
+const fmtN = (v, d) => v.toLocaleString("en-US", {minimumFractionDigits:d, maximumFractionDigits:d});
+const sgn = (v, d = 0) => { const r = +v.toFixed(d); return (r > 0 ? "+" : r < 0 ? "−" : "") + fmtN(Math.abs(r), d); };
+const ud = v => v > 0 ? "up" : v < 0 ? "dn" : "";
+const sideCls = s => s > 0 ? "up" : s < 0 ? "dn" : "";
+/* v1.7.0 勝率（使用者 2026-10-13 要求，只有那斯達克四組）：已平倉每筆賺 15 點以上才算贏，
+   未達 15 點（含小賺）都算輸；持有中不算。用四捨五入後的點數判斷，跟表上看到的數字一致。 */
+const WIN_PTS = 15;
+function winLine(T, R){
+  if(T.unit !== "點" || !R.cnt) return "";
+  const w = R.trades.filter(x => Math.round(x.g) >= WIN_PTS).length, rate = w / R.cnt * 100;
+  return `<div>勝率 <b class="${rate >= 50 ? "up" : "dn"}">${rate.toFixed(0)}%</b>（贏 ${w}／輸 ${R.cnt - w}，未達 ${WIN_PTS} 點算輸）</div>`;
+}
+function renderTrades(){
+  if($("tradeSheet").hidden) return;
+  const T = TRADE_K.find(x => x.k === tradeK) || TRADE_K[0], d = T.d || 0, u = T.unit;
+  let html;
+  if(!LOGROWS) html = `<div class="tnote">${logErr || "讀取進出紀錄中…"}</div>`;
+  else if(!LOGROWS.some(r => r.k === T.k)) html = `<div class="tnote">這組還沒有正式紀錄（開工跑一次紀錄後才有）</div>`;
+  else{
+    const R = tradesOf(T), o = R.op, tot = R.pts + (o && o.pts != null ? o.pts : 0), totP = R.pct + (o && o.pct != null ? o.pct : 0);
+    const hold = !o ? "目前空手"
+      : `持有中：<span class="${sideCls(o.side)}">${SIDE_T[o.side]}</span> ${tText(o.t)} @${fmtN(o.p, d)}` +
+        (o.pts != null ? `，現價 ${fmtN(o.now, d)}，浮動 <span class="${ud(o.pts)}">${sgn(o.pts)} ${u}（${sgn(o.pct, 2)}%）</span>` : "，現價載入中");
+    html = `<div class="tsum">
+      <div class="tot ${ud(tot)}">合計 ${sgn(tot)} ${u}（${sgn(totP, 2)}%）${o && o.pts == null ? '<small style="font-size:11px;font-weight:400;color:var(--mute)">　不含浮動</small>' : ""}</div>
+      <div>已平倉 ${R.cnt} 筆（賺 ${R.win}／賠 ${R.cnt - R.win}），已實現 <span class="${ud(R.pts)}">${sgn(R.pts)} ${u}（${sgn(R.pct, 2)}%）</span></div>${winLine(T, R)}
+      <div>${hold}</div></div>
+      <div class="tnote">未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>` +
+      (R.gap ? `<div class="tnote warn">正式紀錄最後一筆之後隔太久，網頁只能從 ${tText(R.first.t)} 接著算，中間可能漏掉交易；開工跑一次紀錄就會補齊。</div>` : "");
+    const rowsH = R.trades.map((x, i) => ({x, i: i + 1})).reverse().map(({x, i}) => `<tr class="${x.live ? "live" : ""}">
+      <td>${x.live ? "◆" : ""}${i}</td><td class="${sideCls(x.side)}">${SIDE_T[x.side]}</td>
+      <td>${tText(x.et)}<br><small>${fmtN(x.ep, d)}</small></td>
+      <td>${tText(x.xt)}${x.roll ? " 換倉" : x.fix ? " 校正" : ""}<br><small>${fmtN(x.xp, d)}</small></td>
+      <td class="${ud(x.g)}">${sgn(x.g)}<br><small>${sgn(x.gp, 2)}%</small></td><td class="${ud(x.cum)}">${sgn(x.cum)}</td></tr>`).join("");
+    const holdH = o ? `<tr class="hold${o.live ? " live" : ""}"><td>${o.live ? "◆" : ""}持有</td><td class="${sideCls(o.side)}">${SIDE_T[o.side]}</td>
+      <td>${tText(o.t)}<br><small>${fmtN(o.p, d)}</small></td><td>現價<br><small>${o.now != null ? fmtN(o.now, d) : "—"}</small></td>
+      <td class="${ud(o.pts)}">${o.pts != null ? sgn(o.pts) : "—"}<br><small>${o.pct != null ? sgn(o.pct, 2) + "%" : ""}</small></td><td class="${ud(tot)}">${sgn(tot)}</td></tr>` : "";
+    html += `<table class="tt"><thead><tr><th>#</th><th>方向</th><th>進場</th><th>出場</th><th>盈虧（${u}）</th><th>累計</th></tr></thead>
+      <tbody>${holdH}${rowsH}</tbody></table>`;
+  }
+  document.querySelectorAll("#tradeTabs button").forEach(b => b.classList.toggle("on", b.dataset.k === T.k));
+  if(html !== tradeSig){ tradeSig = html; $("tradeBody").innerHTML = html; }
 }
 
 /* v1.3.0 分頁：只顯示目前那頁的兩格；四格資料都在背景持續更新，切頁不重新載入。記住上次停的頁。 */
@@ -1106,6 +1268,8 @@ setInterval(() => {
     if(p.dirty){ p.dirty = false; recompute(p); draw(p); }
     renderInfo(p);
   }
+  // v1.7.0：交易明細開著時每秒重算（有新翻轉就多一筆）；正式紀錄每 5 分鐘重讀一次
+  if(!$("tradeSheet").hidden){ renderTrades(); if(Date.now() - logAt > 300000) loadLog(); }
   if(lastMsg && Date.now() - lastMsg > 20000 && WS && WS.readyState === 1){
     setStatus("warn", "超過 20 秒沒有收到新資料，重新連線");
     lastMsg = Date.now(); try{ WS.close(); }catch(e){}
