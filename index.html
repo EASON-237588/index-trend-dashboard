@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.8.0</title>
+<title>指數趨勢儀表板 v1.8.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -134,7 +134,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.8.0";
+const VERSION = "v1.8.1";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1128,13 +1128,30 @@ function draw(p){
 
   // 十字線
   const tip = $("tip-" + p.k);
-  if(p.hover != null && p.hover >= i0 && p.hover <= i1){
-    const i = p.hover, x = X(i);
+  const hv = idxAtTime(p, hoverT);   // v1.8.1：六格共用游標時間
+  if(hv != null && hv >= i0 && hv <= i1){
+    const i = hv, x = X(i);
     ctx.strokeStyle = "rgba(200,210,230,.35)"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, padT); ctx.lineTo(Math.round(x) + 0.5, padT + ph); ctx.stroke();
     const ps = posAt(i), st = ps > 0 ? "持多" : ps < 0 ? "持空" : "空手";
     tip.textContent = `${tText(B[i].t)}　收 ${fmtP(p, B[i].c)}　${st}` + (i >= p.done ? "（形成中）" : "");
   }else tip.textContent = "";
+}
+
+/* v1.8.1：十字線六格同步（使用者 2026-10-13 要求）。共用「游標時間」hoverT，每格畫圖時各自找出
+   涵蓋那個時間的 K 棒（30 秒、1 分、6/8/11 分各自對齊）；時間不在該格畫面範圍內就不畫、不自動捲動。
+   游標一動，所有格子在下一個畫格合併重畫一次（看不到的那頁 draw 會直接跳過）。 */
+let hoverT = null, hoverRaf = 0;
+function idxAtTime(p, t){
+  const B = p.bars;
+  if(t == null || !p.ready || !B.length || t < B[0].t) return null;
+  let lo = 0, hi = B.length - 1;   // 最後一根開始時間 ≤ t 的 K 棒
+  while(lo < hi){ const m = (lo + hi + 1) >> 1; if(B[m].t <= t) lo = m; else hi = m - 1; }
+  return lo;
+}
+function setHoverT(t){
+  hoverT = t;
+  if(!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; PANELS.forEach(draw); });
 }
 
 // 以畫面某個位置為錨點縮放（anchor01：0＝最左、1＝最右）
@@ -1162,11 +1179,11 @@ function bindChart(p){
       const r = cv.getBoundingClientRect(), bw = (r.width - (p.padR || PADR)) / p.view.span;
       p.view.off = Math.max(0, Math.round(drag.off + (e.clientX - drag.x) / bw));
     }
-    p.hover = idxAt(e.clientX); draw(p);
+    setHoverT(p.bars[idxAt(e.clientX)].t);
   });
   const end = () => { drag = null; };
   cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
-  cv.addEventListener("pointerleave", () => { p.hover = null; draw(p); });
+  cv.addEventListener("pointerleave", () => setHoverT(null));
   cv.addEventListener("wheel", e => {
     if(!p.ready) return;
     e.preventDefault();
