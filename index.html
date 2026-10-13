@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.8.3</title>
+<title>指數趨勢儀表板 v1.8.4</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -65,8 +65,9 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 .panel{flex:1 1 0;min-height:0;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);
   border-radius:8px;padding:5px 7px 6px}
 .ph{flex:none;display:flex;align-items:center;gap:6px;white-space:nowrap}
-.ph b{font-size:14px}
-.tag{font-size:11px;color:var(--mute);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.ph b{font-size:14px;color:#ffd400}
+/* v1.8.4：六格改叫 A～F（照畫面順序），標籤黃字（使用者 2026-10-13 要求） */
+.tag{font-size:11px;color:#ffd400;border:1px solid var(--line);border-radius:4px;padding:0 5px}
 .badge{font-size:12px;font-weight:700;border-radius:4px;padding:1px 8px;background:#2a2f3d;color:var(--mute)}
 .badge.long{background:rgba(255,59,59,.16);color:var(--long)}
 .badge.short{background:rgba(76,255,0,.12);color:var(--short)}
@@ -142,7 +143,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.8.3";
+const VERSION = "v1.8.4";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -377,7 +378,7 @@ function toFlatShort(R){
 
 /* ============ 面板設定（參數讀自 TradingView 版面 JuwDqkR0，2026-10-07） ============ */
 const PANELS = [
-  {k:"rf", pg:"short", title:"那斯達克", tf:"短趨勢・A-1", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
+  {k:"rf", pg:"short", title:"那斯達克", tf:"短趨勢・A", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
    sub:"Range Filter 取樣 200・倍數 23・多空反轉（線色＝濾網方向）",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.6.0：A-2（取樣 400・倍數 16）拿掉，改放 Gate 版（使用者 2026-10-12 指定）。
@@ -385,26 +386,26 @@ const PANELS = [
      為什麼：Binance 擋 Cloudflare，A-1 沒辦法雲端推播；Gate 連得到，LINE 推播改推這組。
      30 天實測（9/14～10/12）：翻轉 59/76 次對上、平均差 13 分；不扣成本 Gate +4.63%、A-1 +1.98%，
      但差距集中在 9/21 那週、5 週裡 A-1 贏 2 週，兩者都輸買進持有（+7.1%）。與 A-1 並行觀察。 */
-  {k:"gate", pg:"short", title:"那斯達克", tf:"短趨勢・Gate", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
+  {k:"gate", pg:"short", title:"那斯達克", tf:"短趨勢・B", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
    sub:"Gate QQQ 合約 30 秒 K・Range Filter 取樣 200・倍數 23（同 A-1 規則，換資料源；LINE 推播這組）",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.2.0 新增參考格：Hyperliquid 1 分 K 沒有 30 秒，取樣減半成 100、倍數 23÷√2≈16 換算。
      2026-10-08 對 TradingView 30 秒 3 天 7 次翻轉：全對上、平均差不到 1 分、無半夜假翻轉；樣本小，觀察中。
      預設只顯示最近 2,100 根（約 35 小時），跟上面 30 秒那格的時間範圍對齊。 */
-  {k:"hl", pg:"short", title:"那斯達克", tf:"短趨勢・參考", sym:"xyz:XYZ100", src:"hl", nq:false, kind:"rf", span:2100,
+  {k:"hl", pg:"short", title:"那斯達克", tf:"短趨勢・C", sym:"xyz:XYZ100", src:"hl", nq:false, kind:"rf", span:2100,
    sub:"Hyperliquid 那斯達克 100 合約 1 分 K・Range Filter 取樣 100・倍數 16",
    P:{per:100, mult:16, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   // v1.1.0 起改用 Yahoo 真 NQ 期貨（經中繼站），價格本身就是 NQ 點數，不換算
-  {k:"nq6", pg:"long", title:"那斯達克", tf:"中長趨勢", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
+  {k:"nq6", pg:"long", title:"那斯達克", tf:"中長趨勢・D", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
    sub:"NQ 期貨（Yahoo 延遲約 10 分鐘）・Donchian 回看 350 小時（3,500 根）・停損 8 ATR・空手改放空",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:6}},
-  {k:"gold8", pg:"long", title:"黃金", tf:"中長趨勢", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
+  {k:"gold8", pg:"long", title:"黃金", tf:"中長趨勢・E", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
    P:{lookH:350, mode:"both", stopAtr:8, atrLen:14, tfMin:8}},
   /* v1.5.0 新增：黃金儀表板「上方」那組，也是 LINE 推播（V2.07 起）推的那組。
      資料、K 線切法、算法都照黃金儀表板：Binance 現貨 PAXG、24 小時、從 1970 起算的 11 分桶、calcDonG。
      現貨不在合約那條即時連線裡，改用每 20 秒輪詢（pollSpot）。 */
-  {k:"gold11", pg:"long", title:"黃金", tf:"中長趨勢・上方", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
+  {k:"gold11", pg:"long", title:"黃金", tf:"中長趨勢・F", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
    /* v1.5.1：畫面跟黃金儀表板上方一樣顯示最近 12,000 根（約 92 天）；
       多抓 2,200 根給回看 1,909 根＋ATR 暖機，起點的持倉狀態才對 */
    nq:false, kind:"don", tfMin:11, span:12000, needBars:14200, flatCol:"#4cff00", flatShort:true,
@@ -864,12 +865,12 @@ function renderInfo(p){
    即時那幾筆可能跟正式紀錄差幾點（C 格網頁用連續月 NQ=F、紀錄用單一月份合約；Gate 網頁用原生 30 秒 K、
    紀錄用逐筆合成），下次開工跑紀錄後以正式紀錄為準。 */
 const TRADE_K = [
-  {k:"A", pk:"rf",     name:"A-1",  unit:"點"},
-  {k:"G", pk:"gate",   name:"Gate", unit:"點"},
-  {k:"B", pk:"hl",     name:"B",    unit:"點"},
-  {k:"C", pk:"nq6",    name:"C",    unit:"點"},
-  {k:"D", pk:"gold8",  name:"D 黃金", unit:"美元", d:2},
-  {k:"E", pk:"gold11", name:"E 黃金", unit:"美元", d:2},
+  {k:"A", pk:"rf",     name:"A",    unit:"點"},
+  {k:"G", pk:"gate",   name:"B",    unit:"點"},
+  {k:"B", pk:"hl",     name:"C",    unit:"點"},
+  {k:"C", pk:"nq6",    name:"D",    unit:"點"},
+  {k:"D", pk:"gold8",  name:"E 黃金", unit:"美元", d:2},
+  {k:"E", pk:"gold11", name:"F 黃金", unit:"美元", d:2},
 ];
 const SIDE_N = {"多":1, "空":-1, "空手":0}, SIDE_T = {1:"多", "-1":"空", 0:"空手"};
 let LOGROWS = null, LOGCOVER = {}, logAt = 0, logErr = "", logBusy = false, tradeK = "A", tradeSig = "";
