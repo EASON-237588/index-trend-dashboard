@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.7.1</title>
+<title>指數趨勢儀表板 v1.8.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -134,7 +134,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.7.1";
+const VERSION = "v1.8.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -358,6 +358,15 @@ function calcDonG(B, P){
   return {pos, avg:avgA, atr, look, exitN, hh, ll, all: sigs, sigs: sigs.filter(s => s.i >= warm), warm};
 }
 
+/* v1.8.0：使用者 2026-10-13 要求 C、E 格「空手改放空」——原規則（只做多）空手的時段一律持空、永遠在場。
+   進出時機不變：原本出場／停損的那根改成翻空，原本突破進場的那根從空翻多；原規則還沒有部位的前段也算空。 */
+function toFlatShort(R){
+  R.pos = R.pos.map(s => s > 0 ? 1 : -1);
+  R.all = [];
+  for(let i = 1; i < R.pos.length; i++) if(R.pos[i] !== R.pos[i-1]) R.all.push({i, d:R.pos[i]});
+  R.sigs = R.all.filter(s => s.i >= R.warm);
+}
+
 /* ============ 面板設定（參數讀自 TradingView 版面 JuwDqkR0，2026-10-07） ============ */
 const PANELS = [
   {k:"rf", pg:"short", title:"那斯達克", tf:"短趨勢・A-1", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
@@ -378,8 +387,8 @@ const PANELS = [
    sub:"Hyperliquid 那斯達克 100 合約 1 分 K・Range Filter 取樣 100・倍數 16",
    P:{per:100, mult:16, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   // v1.1.0 起改用 Yahoo 真 NQ 期貨（經中繼站），價格本身就是 NQ 點數，不換算
-  {k:"nq6", pg:"long", title:"那斯達克", tf:"中長趨勢", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00",
-   sub:"NQ 期貨（Yahoo 延遲約 10 分鐘）・Donchian 回看 350 小時（3,500 根）・只做多・停損 8 ATR",
+  {k:"nq6", pg:"long", title:"那斯達克", tf:"中長趨勢", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
+   sub:"NQ 期貨（Yahoo 延遲約 10 分鐘）・Donchian 回看 350 小時（3,500 根）・停損 8 ATR・空手改放空",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:6}},
   {k:"gold8", pg:"long", title:"黃金", tf:"中長趨勢", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
@@ -390,8 +399,8 @@ const PANELS = [
   {k:"gold11", pg:"long", title:"黃金", tf:"中長趨勢・上方", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
    /* v1.5.1：畫面跟黃金儀表板上方一樣顯示最近 12,000 根（約 92 天）；
       多抓 2,200 根給回看 1,909 根＋ATR 暖機，起點的持倉狀態才對 */
-   nq:false, kind:"don", tfMin:11, span:12000, needBars:14200, flatCol:"#4cff00",
-   sub:"PAXG 現貨 11 分（24 小時）・Donchian 回看 350 小時（1,909 根）・只做多・停損 8 ATR・同黃金儀表板上方與 LINE 推播",
+   nq:false, kind:"don", tfMin:11, span:12000, needBars:14200, flatCol:"#4cff00", flatShort:true,
+   sub:"PAXG 現貨 11 分（24 小時）・Donchian 回看 350 小時（1,909 根）・停損 8 ATR・空手改放空（黃金儀表板與 LINE 推播仍是只做多）",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:11}},
 ];
 for(const p of PANELS){ p.bars = []; p.done = 0; p.R = null; p.view = {span:p.span, off:0}; p.hover = null; p.dirty = false; p.ready = false; }
@@ -736,6 +745,7 @@ function recompute(p){
   p.bars = B;
   const done = B.slice(0, p.done);
   p.R = p.kind === "rf" ? calcRF(done, p.P) : p.goldExact ? calcDonG(done, p.P) : calcDon(done, p.P);
+  if(p.flatShort) toFlatShort(p.R);
   p.ready = true;
   $("wait-" + p.k).hidden = true;
 }
@@ -825,9 +835,9 @@ function renderInfo(p){
     }else if(e.side > 0){
       const a = R.atr[n - 1], stop = R.avg[n - 1] - p.P.stopAtr * a;
       const out = Math.max(lo(exitN), stop);
-      trigK = out === stop ? "停損線" : "出場線"; trig = fmtP(p, out);
+      trigK = out === stop ? (p.flatShort ? "停損翻空" : "停損線") : (p.flatShort ? "翻空線" : "出場線"); trig = fmtP(p, out);
     }else{
-      trigK = "進場線"; trig = fmtP(p, hi(look));
+      trigK = p.flatShort ? "翻多線" : "進場線"; trig = fmtP(p, hi(look));
     }
   }
   $("px-" + p.k).innerHTML = fmtP(p, last.c) + (e.side ? `<small class="${pnlCls}">${pnl}</small>` : "");

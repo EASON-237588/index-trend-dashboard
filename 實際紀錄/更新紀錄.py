@@ -43,7 +43,7 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15), "E": ms(2026, 8, 15)}
 ORDER = ["A", "G", "B", "C", "D", "E"]
 LABEL = {"A": "A-1", "A2": "A-2", "G": "Gate", "B": "B", "C": "C", "D": "D", "E": "E"}
-NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢・Gate 資料（取樣 200、倍數 23）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢", "D": "黃金中長趨勢", "E": "黃金中長趨勢・上方（只做多）"}
+NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢・Gate 資料（取樣 200、倍數 23）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢（空手放空）", "D": "黃金中長趨勢", "E": "黃金中長趨勢・上方（空手放空）"}
 GOLD = ("D", "E")   # 單位是美元/盎司
 
 # C 格合約與換月日（CME 慣例：到期前約一週的週四換到下一季）。過了最後一列要往下加
@@ -395,6 +395,21 @@ def update(k, B, pos, warm, contract, nqconv=None, min_t=None):
             add(i, action(cur, pos[i]), pos[i]); cur = pos[i]
     return new
 
+# 2026-10-13 起 C、E 格「空手改放空」（使用者指定；紀錄從當天起照新規則，舊列不改）：
+# 原規則（只做多）空手的時段一律持空、永遠在場；進出時機不變。儀表板 v1.8.0 的 toFlatShort 同一套。
+# 黃金儀表板「上方」與 LINE 推播仍是只做多，E 格從此跟它們不同。
+def flat_short(pos): return [1 if p == 1 else -1 for p in pos]
+
+def switch_rule(k, B, pos, contract):
+    """紀錄最後是空手、新規則部位不是空手 → 以最新一根收盤價補一筆開倉。新規則不再有空手，所以只會發生一次。"""
+    rows = [r for r in LOG_ROWS if r["格子"] == k]
+    if not rows or rows[-1]["部位"] != "空手" or pos[-1] == 0: return []
+    t = B[-1][0]; p = B[-1][4]
+    r = {"格子": k, "時間": tpe(t), "動作": action(0, pos[-1]), "部位": SIDE[pos[-1]], "價格": f"{p:g}",
+         "換算那斯達克": "", "合約": contract, "備註": "規則改為空手放空（2026-10-13 起），以當時價格開倉", "時間戳": t}
+    LOG_ROWS.append(r)
+    return [r]
+
 # ============ 績效 ============
 def perf(k, rows, last_price, last_t, nq_last=None):
     pts = pct = 0.0; n = win = 0; side = 0; ent = None; ent_nq = None; ent_t = None; trades = []
@@ -510,10 +525,10 @@ if __name__ == "__main__":
     print("抓 C：Yahoo 那斯達克單一月份合約")
     act = [c for c in C_CONTRACTS if c[2] is None or c[2] <= NOW][-1]
     rowsC = [x for x in LOG_ROWS if x["格子"] == "C"]
-    BC, real_from = bars_C(act[0]); posC, wC = calc_don(BC, 350, 6, "long", 8)
+    BC, real_from = bars_C(act[0]); posC, wC = calc_don(BC, 350, 6, "long", 8); posC = flat_short(posC)
     if rowsC and rowsC[-1]["合約"] != act[1]:  # 換月
         prev = [c for c in C_CONTRACTS if c[1] == rowsC[-1]["合約"]][0]
-        BO, _ = bars_C(prev[0]); posO, _ = calc_don(BO, 350, 6, "long", 8)
+        BO, _ = bars_C(prev[0]); posO, _ = calc_don(BO, 350, 6, "long", 8); posO = flat_short(posO)
         LOG_ROWS_SAVE = LOG_ROWS
         oldnew = update("C", [b for b in BO if b[0] < act[2]], posO, wC, prev[1]); added += oldnew; LOG_ROWS += oldnew
         side_before = {"多": 1, "空": -1, "空手": 0}[([x for x in LOG_ROWS if x["格子"] == "C"])[-1]["部位"]]
@@ -525,6 +540,7 @@ if __name__ == "__main__":
             r = {"格子": "C", "時間": tpe(BC[i_roll][0]), "動作": "換約", "部位": "空手", "價格": f"{BC[i_roll][4]:g}",
                  "換算那斯達克": "", "合約": act[1], "備註": f"空手換到 {act[1]}", "時間戳": BC[i_roll][0]}
         added.append(r); LOG_ROWS.append(r)
+    added += switch_rule("C", BC, posC, act[1])
     added += update("C", BC, posC, wC, act[1], min_t=real_from); LAST["C"] = (BC[-1][4], BC[-1][0], None)
 
     print("抓 D：Binance XAUUSDT 1 分 K")
@@ -532,7 +548,8 @@ if __name__ == "__main__":
     added += update("D", BD, posD, wD, "XAUUSDT"); LAST["D"] = (BD[-1][4], BD[-1][0], None)
 
     print("抓 E：Binance 現貨 PAXGUSDT 1 分 K")
-    BE = bars_E(min(last_t("E", START["E"]), NOW) - 70 * 86400000); posE, wE = calc_don_g(BE)
+    BE = bars_E(min(last_t("E", START["E"]), NOW) - 70 * 86400000); posE, wE = calc_don_g(BE); posE = flat_short(posE)
+    added += switch_rule("E", BE, posE, "PAXGUSDT")
     added += update("E", BE, posE, wE, "PAXGUSDT"); LAST["E"] = (BE[-1][4], BE[-1][0], None)
 
     BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE}
