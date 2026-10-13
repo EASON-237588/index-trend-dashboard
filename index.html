@@ -3,14 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.8.1</title>
+<title>指數趨勢儀表板 v1.8.3</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="指數趨勢">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0e14'/%3E%3Cpath d='M8 46 L22 34 L32 40 L46 20 L56 26' fill='none' stroke='%23ff3b3b' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<!-- v1.8.3：浮動點數方塊用圓體，只載入數字與正負號 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@900&text=0123456789%2B%E2%88%92.,&display=swap">
+<link rel="icon"href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230b0e14'/%3E%3Cpath d='M8 46 L22 34 L32 40 L46 20 L56 26' fill='none' stroke='%23ff3b3b' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#0b0e14; --panel:#131722; --line:#232838; --text:#d6dbe6; --mute:#8b93a7; --dim:#5d6578;
@@ -70,9 +72,15 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 .badge.short{background:rgba(76,255,0,.12);color:var(--short)}
 .px{margin-left:auto;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
 .px small{font-size:12px;font-weight:400;margin-left:6px}
-.kv{flex:none;font-size:11px;color:var(--mute);margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+.kv{flex:none;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mute);margin:2px 0 4px;white-space:nowrap;
   font-variant-numeric:tabular-nums}
+.kv .kvt{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .kv b{font-weight:400;color:var(--text)}
+/* v1.8.2：持有中的浮動點數放第二行最右邊，白底；賺紅字、虧綠字，不放百分比（使用者 2026-10-13 要求）。
+   白底上原本的亮綠看不清楚，綠字改深一點。 */
+.flt{flex:none;margin-left:auto;background:#fff;border-radius:4px;padding:0 7px;font-size:13px;font-weight:900;line-height:17px;color:#555;
+  font-family:"Nunito","Arial Rounded MT Bold",sans-serif}
+.flt.up{color:#e00000}.flt.dn{color:#00960f}
 .up{color:var(--long)}.dn{color:var(--short)}
 .cw{position:relative;flex:1;min-height:0;border-radius:5px;overflow:hidden;background:#0e121b}
 canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
@@ -134,7 +142,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.8.1";
+const VERSION = "v1.8.3";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -814,10 +822,12 @@ function renderInfo(p){
   badge.className = "badge " + (e.side > 0 ? "long" : e.side < 0 ? "short" : flatCls);
   badge.textContent = e.side > 0 ? "持多" : e.side < 0 ? "持空" : "空手";
 
-  let pnl = "—", pnlCls = "";
-  if(e.side && e.price){
-    const r = (last.c / e.price - 1) * 100 * e.side;
-    pnl = (r >= 0 ? "+" : "") + r.toFixed(0) + "%"; pnlCls = r >= 0 ? "up" : "dn";
+  // 浮動點數：那斯達克兩格用換算後的那斯達克點數（跟交易明細一樣），換算比例還沒出來就先不顯示
+  let flt = "";
+  if(e.side && e.price && (!p.nq || RATIO)){
+    const T = TRADE_K.find(x => x.pk === p.k), d = T && T.d || 0;
+    const v = (fx(p, last.c) - fx(p, e.price)) * e.side;
+    flt = `<span class="flt ${ud(+v.toFixed(d))}">${sgn(v, d)}</span>`;
   }
   // 下一個會讓部位改變的價位
   let trig = "—", trigK = "觸發線";
@@ -840,11 +850,11 @@ function renderInfo(p){
       trigK = p.flatShort ? "翻多線" : "進場線"; trig = fmtP(p, hi(look));
     }
   }
-  $("px-" + p.k).innerHTML = fmtP(p, last.c) + (e.side ? `<small class="${pnlCls}">${pnl}</small>` : "");
+  $("px-" + p.k).innerHTML = fmtP(p, last.c);
   const parts = [];
   if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, `<b>${durText(Date.now() - e.t)}</b>`);
   parts.push(`${trigK} <b>${trig}</b>`);
-  $("kv-" + p.k).innerHTML = parts.join(" · ");
+  $("kv-" + p.k).innerHTML = `<span class="kvt">${parts.join(" · ")}</span>` + flt;
 }
 
 /* ============ v1.7.0 交易明細（取代曲線圖；使用者 2026-10-13 要求「只要有交易就自動更新」） ============
