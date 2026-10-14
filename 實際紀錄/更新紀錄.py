@@ -10,6 +10,9 @@
                           2026-10-12 取代 A-2：A2 舊紀錄保留，之後不再更新
   E 黃金中長趨勢・上方    Binance 現貨 PAXGUSDT 11 分（24 小時），Donchian 350 小時只做多＋8 ATR 停損
                           （= 黃金儀表板上方、LINE 推播那組，算法照 index.html 的 calcDonG）
+  R30/R1/R2（畫面 G、H、I，2026-10-14 加入，儀表板 v1.9.0「觀察」頁）通用趨勢反手＋日線 60 日均線只擋空單：
+     R30 用 A 的 QQQUSDT 30 秒（60/70）、R1 用 B 的 Hyperliquid 1 分（60/50）、R2 用 C 的單一月份合約 2 分（60/70，只用 2 分 K 段）
+     三組都從 2026-10-14 起算（Hyperliquid 只能回溯約 3.5 天，回不到 10/6）。R2 換月（12/11）時還不會記換倉，觀察期到 11/10 碰不到。
 
 紀錄規則
 - 只往後追加，不改舊列。舊列就是當時的實際紀錄，日後資料源修正也不回頭改。
@@ -20,7 +23,7 @@
 
 只用 Python 內建模組，三台電腦都能直接跑。
 """
-import csv, io, json, os, sys, time, urllib.request, zipfile
+import bisect, csv, io, json, os, sys, time, urllib.request, zipfile
 from collections import deque
 from datetime import datetime, timedelta, timezone
 
@@ -40,13 +43,15 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 # 紀錄檔裡原本的「A」欄位就是 A-1（舊紀錄只追加不改，欄位名稱不動）。
 # E（2026-10-12 加入）＝黃金上方策略，起算日比照 C、D。
 # G（2026-10-12 加入，取代 A-2）＝Gate 版，起算日與 A-1 同為 10/6，方便並排比較。A2 舊列保留但不再更新、不再印績效。
-START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 1, 5), "E": ms(2020, 9, 15)}
+START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 1, 5), "E": ms(2020, 9, 15),
+         "R30": ms(2026, 10, 14), "R1": ms(2026, 10, 14), "R2": ms(2026, 10, 14)}
 # 2026-10-14 使用者要求 D、E 回溯拉到最大：XAUUSDT 2025/12/11 上市、PAXGUSDT 1 分 K 從 2020/08/28，各扣 350 小時暖機。
 # C 維持 8/15：單一月份合約的真 5 分 K 只有 60 天，更早只剩小時 K（9 月約已下市）。
-ORDER = ["A", "G", "B", "C", "D", "E"]
+ORDER = ["A", "G", "B", "C", "D", "E", "R30", "R1", "R2"]
 # LABEL 是畫面代號（v1.8.4 起照畫面順序叫 A～F），只用在印績效與曲線圖標題；紀錄檔「格子」欄仍是左邊的內部代號。
-LABEL = {"A": "A", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F"}
-NAME = {"A": "那斯達克短趨勢（Binance 30 秒，取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢（Gate 30 秒，取樣 200、倍數 23）", "B": "那斯達克短趨勢（1 分，取樣 100、倍數 16）", "C": "那斯達克中長趨勢（6 分，空手放空）", "D": "黃金中長趨勢（8 分）", "E": "黃金中長趨勢（11 分，空手放空）"}
+LABEL = {"A": "A", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I"}
+NAME = {"A": "那斯達克短趨勢（Binance 30 秒，取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢（Gate 30 秒，取樣 200、倍數 23）", "B": "那斯達克短趨勢（1 分，取樣 100、倍數 16）", "C": "那斯達克中長趨勢（6 分，空手放空）", "D": "黃金中長趨勢（8 分）", "E": "黃金中長趨勢（11 分，空手放空）",
+        "R30": "那斯達克觀察（30 秒 ATR 反手 60/70＋日線 60）", "R1": "那斯達克觀察（1 分 ATR 反手 60/50＋日線 60）", "R2": "那斯達克觀察（2 分 ATR 反手 60/70＋日線 60）"}
 GOLD = ("D", "E")   # 單位是美元/盎司
 
 # C 格合約與換月日（CME 慣例：到期前約一週的週四換到下一季）。過了最後一列要往下加
@@ -351,6 +356,47 @@ def calc_don_g(B, lookH=350, tf=11, stop_atr=8, atr_len=14):
         pos[i] = side
     return pos, look + atr_len
 
+def calc_atr_rev(B, L, mult, reg_len, daily):
+    """照 index.html 的 calcAtrRev（＝通用趨勢反手 v1.2.0）：ATR 追蹤線反手，日線在 reg_len 日均線之上時空單改空手。"""
+    n = len(B); H = [b[2] for b in B]; Lo = [b[3] for b in B]
+    atr = pine_ma(true_range(B), L, 1 / L)
+    hh1, ll1 = roll(H, L, True), roll(Lo, L, False)   # 不含當根；含當根＝往後挪一根
+    raw = [0] * n; lsp = ssp = None; d = 0
+    for i in range(n):
+        hh = hh1[i + 1] if i + 1 < n else max(H[n - L:]); ll = ll1[i + 1] if i + 1 < n else min(Lo[n - L:])
+        a = atr[i]
+        if a is None or hh is None or i < L - 1: continue
+        ls0 = hh - mult * a; ss0 = ll + mult * a; c = B[i][4]; pc = B[i-1][4] if i else c
+        lprev = ls0 if lsp is None else lsp; sprev = ss0 if ssp is None else ssp
+        ls = max(ls0, lprev) if i and pc > lprev else ls0
+        ss = min(ss0, sprev) if i and pc < sprev else ss0
+        sigL = c > (c if ssp is None else ssp); sigS = c < (c if lsp is None else lsp)
+        if d == 1:
+            if sigS: d = -1
+        elif d == -1:
+            if sigL: d = 1
+        else: d = 1 if sigL else -1 if sigS else 0
+        lsp, ssp = ls, ss; raw[i] = d
+    warm = L * 6
+    pos = [0 if i < warm else (0 if raw[i] == -1 and daily_up(B[i][0], reg_len, daily) else raw[i]) for i in range(n)]
+    return pos, warm
+
+def trade_day(t):
+    """美東 18:00 之後算下一個交易日，回傳 'YYYY-MM-DD'（同 index.html 的 tradeDay）"""
+    x = t + 6 * 3600000
+    return (datetime.fromtimestamp(x / 1000, timezone.utc) + timedelta(hours=ny_offset_h(x))).strftime("%Y-%m-%d")
+
+def daily_nq():
+    """連續月 NQ=F 兩年日線 → (交易日, 收盤)，同中繼站 ?iv=1d"""
+    b = yahoo("NQ=F", "1d", "2y")
+    return [trade_day(t + 12 * 3600000) for t, *_ in b], [x[4] for x in b]
+
+def daily_up(t, n, daily):
+    d, c = daily; td = trade_day(t)
+    j = bisect.bisect_left(d, td) - 1
+    if j < n - 1: return True
+    return c[j] / (sum(c[j - n + 1:j + 1]) / n) >= 1
+
 # ============ 紀錄 ============
 def load_log():
     if not os.path.exists(LOG): return []
@@ -510,7 +556,7 @@ if __name__ == "__main__":
     added += update("B", BB, posB, wB, "xyz:XYZ100"); LAST["B"] = (BB[-1][4], BB[-1][0], None)
 
     print("抓 A：QQQUSDT 逐筆成交（第一次較久）")
-    since = min(last_t("A", START["A"]), NOW) - 3 * 86400000
+    since = min(last_t("A", START["A"]), last_t("R30", START["R30"]), NOW) - 3 * 86400000   # G 格（R30）共用這份 30 秒線，翻轉較少，要從兩者較早的那筆往前抓
     BA = bars_A(since); posA, wA = calc_rf(BA, 200, 23)
     ratio = [None]
     def nqconv(t, p):
@@ -558,7 +604,17 @@ if __name__ == "__main__":
     added += switch_rule("E", BE, posE, "PAXGUSDT")
     added += update("E", BE, posE, wE, "PAXGUSDT"); LAST["E"] = (BE[-1][4], BE[-1][0], None)
 
-    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE}
+    print("算 G、H、I：通用趨勢反手＋日線 60 日濾網")
+    DAILY = daily_nq()
+    posR30, wR30 = calc_atr_rev(BA, 60, 70, 60, DAILY)
+    added += update("R30", BA, posR30, wR30, "QQQUSDT", nqconv); LAST["R30"] = LAST["A"]
+    posR1, wR1 = calc_atr_rev(BB, 60, 50, 60, DAILY)
+    added += update("R1", BB, posR1, wR1, "xyz:XYZ100"); LAST["R1"] = LAST["B"]
+    BR2 = agg_session(yahoo(act[0], "2m", "60d"), 2)   # 只用 2 分 K 段，跟儀表板 I 格一致
+    posR2, wR2 = calc_atr_rev(BR2, 60, 70, 60, DAILY)
+    added += update("R2", BR2, posR2, wR2, act[1]); LAST["R2"] = (BR2[-1][4], BR2[-1][0], None)
+
+    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
