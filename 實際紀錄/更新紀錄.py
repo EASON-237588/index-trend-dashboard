@@ -40,7 +40,9 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 # 紀錄檔裡原本的「A」欄位就是 A-1（舊紀錄只追加不改，欄位名稱不動）。
 # E（2026-10-12 加入）＝黃金上方策略，起算日比照 C、D。
 # G（2026-10-12 加入，取代 A-2）＝Gate 版，起算日與 A-1 同為 10/6，方便並排比較。A2 舊列保留但不再更新、不再印績效。
-START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 8, 15), "E": ms(2026, 8, 15)}
+START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 8, 15), "D": ms(2026, 1, 5), "E": ms(2020, 9, 15)}
+# 2026-10-14 使用者要求 D、E 回溯拉到最大：XAUUSDT 2025/12/11 上市、PAXGUSDT 1 分 K 從 2020/08/28，各扣 350 小時暖機。
+# C 維持 8/15：單一月份合約的真 5 分 K 只有 60 天，更早只剩小時 K（9 月約已下市）。
 ORDER = ["A", "G", "B", "C", "D", "E"]
 LABEL = {"A": "A-1", "A2": "A-2", "G": "Gate", "B": "B", "C": "C", "D": "D", "E": "E"}
 NAME = {"A": "那斯達克短趨勢（取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢・Gate 資料（取樣 200、倍數 23）", "B": "那斯達克短趨勢・參考", "C": "那斯達克中長趨勢（空手放空）", "D": "黃金中長趨勢", "E": "黃金中長趨勢・上方（空手放空）"}
@@ -485,7 +487,9 @@ def draw_curves(res, path):
         for s in ("left", "bottom"): ax.spines[s].set_color(GRID)
         ax.tick_params(colors=MUTED, labelsize=9)
         if (eq[-1][0] - eq[0][0]) < 15 * 86400000: ax.xaxis.set_major_locator(mdates.DayLocator())
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
+        if (eq[-1][0] - eq[0][0]) > 400 * 86400000:  # 跨年（E 格回溯到 2020）只標年份，否則每格都是 01/01
+            ax.xaxis.set_major_locator(mdates.YearLocator()); ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
+        else: ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%d"))
         ax.margins(x=0.04)
     fig.text(0.01, 0.003, "每根 K 線收盤的「已實現＋持有中浮動」，單位為點數（黃金：美元/盎司）。未扣手續費。", color=MUTED, fontsize=8.5)
     fig.tight_layout(rect=(0, 0.015, 1, 1)); fig.savefig(path, dpi=130, facecolor=BG); plt.close(fig)
