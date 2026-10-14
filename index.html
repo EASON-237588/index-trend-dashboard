@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.8.5</title>
+<title>指數趨勢儀表板 v1.9.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -121,7 +121,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 <div class="app">
 <header>
   <h1>指數趨勢儀表板<small id="ver"></small></h1>
-  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="long">中長趨勢</button></div>
+  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="long">中長趨勢</button><button data-pg="obs">觀察</button></div>
   <button class="hbtn" id="tradeBtn">交易明細</button>
   <div class="status"><i class="dot" id="dot"></i><span id="stTxt">準備中</span></div>
 </header>
@@ -143,7 +143,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.8.5";
+const VERSION = "v1.9.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -367,6 +367,70 @@ function calcDonG(B, P){
   return {pos, avg:avgA, atr, look, exitN, hh, ll, all: sigs, sigs: sigs.filter(s => s.i >= warm), warm};
 }
 
+/* ============ v1.9.0 通用趨勢反手（ATR 追蹤線）：逐行照 黃金分析儀表板\通用趨勢反手_v1.2.0.pine ============
+   使用者 2026-10-14 要求 G、H、I 三格並行觀察。2026-04-06～10-13 QQQ 合約半年回測（扣單邊 3 點）：
+   G 30 秒 60/70 +12.8%（94 筆、1 個月虧）、H 1 分 60/50 +11.2%（68 筆）、I 2 分 60/70 +11.5%（19 筆），
+   現行 A/B −40.1%、C −37.3%、買進持有 +26.4%——三組都輸抱著，只在 7 月大盤 −6.8% 時賺。
+   日線濾網：前一個已收盤交易日的 NQ 收盤 ÷ 60 日均線 ≥ 1 時不做空（改空手），多單不擋（Pine「只擋空單」）。 */
+function calcAtrRev(B, P){
+  const n = B.length, L = P.len, m = P.mult;
+  const atr = pineRma(trueRange(B), L);
+  const H = B.map(b => b.h), Lo = B.map(b => b.l);
+  // ta.highest(high, L) 含當根＝不含當根的 rollMax 往後挪一根
+  const hh1 = rollMax(H, L), ll1 = rollMin(Lo, L);
+  const pos = new Array(n).fill(0), raw = new Array(n).fill(0), lsA = new Array(n).fill(null), ssA = new Array(n).fill(null);
+  let lsp = null, ssp = null, d = 0;
+  for(let i = 0; i < n; i++){
+    const hh = i + 1 < n ? hh1[i + 1] : Math.max(...H.slice(n - L)), ll = i + 1 < n ? ll1[i + 1] : Math.min(...Lo.slice(n - L));
+    const a = atr[i];
+    if(a == null || hh == null || i < L - 1) continue;
+    const ls0 = hh - m * a, ss0 = ll + m * a, c = B[i].c, pc = i ? B[i-1].c : c;
+    const lprev = lsp == null ? ls0 : lsp, sprev = ssp == null ? ss0 : ssp;
+    const ls = i && pc > lprev ? Math.max(ls0, lprev) : ls0;
+    const ss = i && pc < sprev ? Math.min(ss0, sprev) : ss0;
+    const sigL = c > (ssp == null ? c : ssp), sigS = c < (lsp == null ? c : lsp);
+    if(d === 1){ if(sigS) d = -1; }
+    else if(d === -1){ if(sigL) d = 1; }
+    else d = sigL ? 1 : sigS ? -1 : 0;
+    lsp = ls; ssp = ss; raw[i] = d; lsA[i] = ls; ssA[i] = ss;
+  }
+  const warm = L * 6;
+  for(let i = 0; i < n; i++){
+    let s = i < warm ? 0 : raw[i];
+    if(s === -1 && dailyUp(B[i].t, P.regLen)) s = 0;
+    pos[i] = s;
+  }
+  const all = [];
+  for(let i = 1; i < n; i++) if(pos[i] !== pos[i-1]) all.push({i, d:pos[i]});
+  return {pos, raw, ls:lsA, ss:ssA, atr, all, sigs: all.filter(s => s.i >= warm), warm};
+}
+/* 日線：中繼站 ?iv=1d（連續月 NQ=F，兩年）。交易日從美東 18:00 起算，用「這根之前最後一個已收盤交易日」。 */
+let DAILY = null;
+const ETD = new Intl.DateTimeFormat("en-CA", {timeZone:"America/New_York", year:"numeric", month:"2-digit", day:"2-digit"});
+const TDC = new Map();
+function tradeDay(t){   // 美東 18:00 之後算下一個交易日
+  const key = Math.floor((t + 6 * 3600000) / 3600000);
+  let v = TDC.get(key);
+  if(!v){ v = ETD.format(new Date(key * 3600000)); TDC.set(key, v); }
+  return v;
+}
+function dailyUp(t, len){
+  if(!DAILY) return true;
+  const td = tradeDay(t);
+  let lo = 0, hi = DAILY.d.length - 1, j = -1;
+  while(lo <= hi){ const md = (lo + hi) >> 1; if(DAILY.d[md] < td){ j = md; lo = md + 1; } else hi = md - 1; }
+  if(j < len - 1) return true;
+  let sum = 0; for(let k = j - len + 1; k <= j; k++) sum += DAILY.c[k];
+  return DAILY.c[j] / (sum / len) >= 1;
+}
+async function loadDaily(){
+  const j = await jget(NQ_RELAY + "?iv=1d");
+  if(j.error) throw new Error(j.error);
+  // Yahoo 日線時間戳在交易日當天（美東 00:00 前後），+18 小時落在同一交易日的 18:00 之前
+  DAILY = {d: j.bars.map(b => tradeDay(b[0] + 12 * 3600000)), c: j.bars.map(b => b[4])};
+  PANELS.forEach(p => { if(p.kind === "atr") p.dirty = true; });
+}
+
 /* v1.8.0：使用者 2026-10-13 要求 C、E 格「空手改放空」——原規則（只做多）空手的時段一律持空、永遠在場。
    進出時機不變：原本出場／停損的那根改成翻空，原本突破進場的那根從空翻多；原規則還沒有部位的前段也算空。 */
 function toFlatShort(R){
@@ -411,11 +475,21 @@ const PANELS = [
    nq:false, kind:"don", tfMin:11, span:12000, needBars:14200, flatCol:"#4cff00", flatShort:true,
    sub:"PAXG 現貨 11 分（24 小時）・Donchian 回看 350 小時（1,909 根）・停損 8 ATR・空手改放空（黃金儀表板與 LINE 推播仍是只做多）",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:11}},
+  /* v1.9.0 觀察頁：通用趨勢反手＋日線 60 日均線只擋空單，跟 A／C／D 的資料源一致，並行觀察到 11/10 */
+  {k:"atr30", pg:"obs", title:"那斯達克", tf:"觀察・G", sym:"QQQUSDT", nq:true, kind:"atr", span:1e9,
+   sub:"Binance QQQ 合約 30 秒（同 A）・ATR 反手 60/70・日線 60 日均線之上不做空",
+   P:{len:60, mult:70, regLen:60}},
+  {k:"atr1", pg:"obs", title:"那斯達克", tf:"觀察・H", sym:"xyz:XYZ100", src:"hl", nq:false, kind:"atr", span:2100,
+   sub:"Hyperliquid 1 分 K（同 C）・ATR 反手 60/50・日線 60 日均線之上不做空",
+   P:{len:60, mult:50, regLen:60}},
+  {k:"atr2", pg:"obs", title:"那斯達克", tf:"觀察・I", sym:"NQ=F", src:"yahoo", nq:false, kind:"atr", tfMin:2, span:1e9,
+   sub:"NQ 期貨單一月份合約 2 分（同 D，延遲約 10 分鐘）・ATR 反手 60/70・日線 60 日均線之上不做空",
+   P:{len:60, mult:70, regLen:60}},
 ];
 for(const p of PANELS){ p.bars = []; p.done = 0; p.R = null; p.view = {span:p.span, off:0}; p.hover = null; p.dirty = false; p.ready = false; }
 const PAN = k => PANELS.find(p => p.k === k);
 // v1.4.0：30 秒線有 A-1、A-2 兩格共用，新成交進來時兩格都要重算
-const dirty30 = () => PANELS.forEach(p => { if(p.kind === "rf" && !p.src) p.dirty = true; });
+const dirty30 = () => PANELS.forEach(p => { if((p.kind === "rf" || p.kind === "atr") && !p.src && !p.tfMin) p.dirty = true; });
 
 // 訊號與狀態列的價格：那斯達克換算成指數點數
 let RATIO = null;
@@ -738,13 +812,15 @@ function recompute(p){
       p.span = Math.max(30, B.filter(b => b.t >= t0).length);
       if(!p.userZoom) p.view.span = p.span;
     }
-  }else if(p.kind === "rf"){
+  }else if((p.kind === "rf" || p.kind === "atr") && !p.tfMin){
     if(!S30.ready) return;
     B = S30.bars;
     const now = Date.now();
     p.done = B.length && B[B.length-1].t + 30000 > now ? B.length - 1 : B.length;
   }else{
-    const raw = RAW1M[p.sym]; if(!raw) return;
+    let raw = RAW1M[p.sym]; if(!raw) return;
+    // I 格：中繼站較早那段是 5 分 K，切成 2 分會讓 ATR 失真，只用 2 分 K 那段（約 36 天）
+    if(p.kind === "atr" && p.src === "yahoo") raw = raw.filter(b => b.t >= YCUT);
     B = p.allDay ? aggAll(raw, p.tfMin) : aggSession(raw, p.tfMin);
     const now = Date.now(), last = B[B.length-1];
     // Yahoo 延遲 10 分鐘：時間到了不代表收完，要看原始 K 線有沒有涵蓋到這根的結尾
@@ -753,7 +829,8 @@ function recompute(p){
   }
   p.bars = B;
   const done = B.slice(0, p.done);
-  p.R = p.kind === "rf" ? calcRF(done, p.P) : p.goldExact ? calcDonG(done, p.P) : calcDon(done, p.P);
+  if(p.kind === "atr" && !DAILY) return;
+  p.R = p.kind === "rf" ? calcRF(done, p.P) : p.kind === "atr" ? calcAtrRev(done, p.P) : p.goldExact ? calcDonG(done, p.P) : calcDon(done, p.P);
   if(p.flatShort) toFlatShort(p.R);
   p.ready = true;
   $("wait-" + p.k).hidden = true;
@@ -835,6 +912,10 @@ function renderInfo(p){
   const done = B.slice(0, p.done);
   if(p.kind === "rf"){
     trigK = "濾網線"; trig = fmtP(p, R.filt[p.done - 1]);
+  }else if(p.kind === "atr"){
+    const d = R.raw[p.done - 1];
+    if(d > 0){ trigK = "翻空線"; trig = fmtP(p, R.ls[p.done - 1]); }
+    else if(d < 0){ trigK = e.side < 0 ? "翻多線" : "翻多線（日線在均線上，不做空）"; trig = fmtP(p, R.ss[p.done - 1]); }
   }else{
     const look = R.look, exitN = R.exitN, n = done.length;
     const hi = (m) => Math.max(...done.slice(n - m).map(b => b.h));
@@ -1217,6 +1298,7 @@ const NQ_CONTRACTS = [
   {sym:"NQM27.CME", name:"2027-06 合約", from:Date.UTC(2027, 2, 11, 16)},
   {sym:"NQU27.CME", name:"2027-09 合約", from:Date.UTC(2027, 5, 10, 16)},
 ];
+let YCUT = 0;
 const nqContract = () => NQ_CONTRACTS.filter(c => c.from <= Date.now()).pop();
 async function loadYahoo(p){
   const c = nqContract();
@@ -1224,7 +1306,8 @@ async function loadYahoo(p){
   p.contract = c;
   if(j.error) throw new Error(j.error);
   RAW1M[p.sym] = j.bars.map(b => ({t:b[0], o:b[1], h:b[2], l:b[3], c:b[4], v:0}));
-  p.dirty = true;
+  YCUT = j.cut || 0;
+  PANELS.forEach(x => { if(x.sym === p.sym) x.dirty = true; });
 }
 /* Hyperliquid 1 分 K：一次最多給約 5,000 根（3.5 天），暖機 600 根綽綽有餘。
    有開 CORS，網頁直接讀，不必經中繼站。之後每 15 秒抓最近 10 分鐘併進去。 */
@@ -1236,7 +1319,7 @@ async function hlCandles(coin, start){
 }
 async function loadHL(p){
   RAW1M[p.sym] = await hlCandles(p.sym, Date.now() - 5000 * 60000);
-  p.dirty = true;
+  PANELS.forEach(x => { if(x.sym === p.sym) x.dirty = true; });
 }
 /* v1.6.0：Gate QQQ_USDT 原生 30 秒 K。一次最多 2,000 根、只能回溯約 10,000 根（約 3.5 天），
    往回抓 5 頁；之後每 10 秒補最後幾根。允許跨網域，不必走中繼站。 */
@@ -1264,7 +1347,7 @@ async function pollGate(p){
 async function pollHL(p){
   if(!RAW1M[p.sym]) return;
   for(const b of await hlCandles(p.sym, Date.now() - 10 * 60000)) mergeKline(p.sym, b);
-  p.dirty = true;
+  PANELS.forEach(x => { if(x.sym === p.sym) x.dirty = true; });
 }
 async function loadDon(p, label){
   if(p.src === "yahoo") return loadYahoo(p);
@@ -1294,6 +1377,7 @@ async function main(){
       loadDon(PAN("gold11"), "黃金 PAXG 現貨").catch(e => { $("wait-gold11").textContent = "PAXG 現貨載入失敗：" + e.message + "，請重新整理"; }),
       loadGate(PAN("gate")).catch(e => { $("wait-gate").textContent = "Gate 30 秒 K 載入失敗：" + e.message + "，請重新整理"; }),
       loadHL(PAN("hl")).catch(e => { $("wait-hl").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
+      loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
   }catch(e){
     for(const k of ["nq6", "gold8"]) $("wait-" + k).textContent = "歷史資料載入失敗：" + e.message + "，請重新整理";
@@ -1303,11 +1387,12 @@ async function main(){
   setInterval(updateRatio, 30000);
   connectWS();
   try{ await load30("QQQUSDT"); dirty30(); updateRatio(); }
-  catch(e){ PANELS.filter(p => p.kind === "rf" && !p.src).forEach(p => { $("wait-" + p.k).textContent = "30 秒線合成失敗：" + e.message + "，請重新整理"; }); setLoad("t30", null); }
+  catch(e){ PANELS.filter(p => (p.kind === "rf" || p.kind === "atr") && !p.src && !p.tfMin).forEach(p => { $("wait-" + p.k).textContent = "30 秒線合成失敗：" + e.message + "，請重新整理"; }); setLoad("t30", null); }
   setInterval(save30, 60000);
   // NQ 期貨沒有即時推送，每分鐘向中繼站重抓（中繼站本身也快取 60 秒）
   setInterval(() => { loadYahoo(PAN("nq6")).catch(() => {}); }, 60000);
   setInterval(() => { pollHL(PAN("hl")).catch(() => {}); }, 15000);
+  setInterval(() => { loadDaily().catch(() => {}); }, 1800000);
   setInterval(() => { pollSpot(PAN("gold11")).catch(() => {}); }, 20000);
   setInterval(() => { pollGate(PAN("gate")).catch(() => {}); }, 10000);
 }

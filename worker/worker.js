@@ -33,16 +33,23 @@ export default {
     const q = url.searchParams.get("sym");
     if(q && !SYM_OK.test(q)) return new Response("bad sym", {status: 400, headers: cors(origin)});
     const sym = q || SYM;
+    // v1.9.0：?iv=1d 回傳日線（給 G、H、I 格的日線 60 日均線濾網），快取 30 分鐘
+    const daily = url.searchParams.get("iv") === "1d";
 
-    const cache = caches.default, key = new Request(url.origin + "/nq" + (q ? "?sym=" + q : ""));
+    const cache = caches.default, key = new Request(url.origin + "/nq" + (q ? "?sym=" + q : "") + (daily ? (q ? "&" : "?") + "iv=1d" : ""));
     let res = await cache.match(key);
     if(!res){
       try{
-        const [m5, m2] = await Promise.all([yahoo(sym, "5m", "60d"), yahoo(sym, "2m", "60d")]);
-        const cut = m2.length ? m2[0][0] : Infinity;
-        const bars = m5.filter(b => b[0] < cut).concat(m2);
-        res = new Response(JSON.stringify({sym, at: Date.now(), cut, bars}), {
-          headers: {"Content-Type": "application/json", "Cache-Control": `public, max-age=${TTL}`}});
+        let body;
+        if(daily){
+          body = {sym, at: Date.now(), bars: await yahoo(sym, "1d", "2y")};
+        }else{
+          const [m5, m2] = await Promise.all([yahoo(sym, "5m", "60d"), yahoo(sym, "2m", "60d")]);
+          const cut = m2.length ? m2[0][0] : Infinity;
+          body = {sym, at: Date.now(), cut, bars: m5.filter(b => b[0] < cut).concat(m2)};
+        }
+        res = new Response(JSON.stringify(body), {
+          headers: {"Content-Type": "application/json", "Cache-Control": `public, max-age=${daily ? 1800 : TTL}`}});
         ctx.waitUntil(cache.put(key, res.clone()));
       }catch(e){
         return new Response(JSON.stringify({error: String(e.message || e)}), {status: 502,
