@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.9.1</title>
+<title>指數趨勢儀表板 v1.9.2</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -143,7 +143,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.9.1";
+const VERSION = "v1.9.2";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -453,6 +453,12 @@ const PANELS = [
   {k:"gate", pg:"short", title:"那斯達克", tf:"短趨勢・B", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
    sub:"Gate QQQ 合約 30 秒 K・Range Filter 取樣 200・倍數 23（同 A-1 規則，換資料源；LINE 推播這組）",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  /* B2（使用者 2026-10-15 要求「B 交易次數過多，調參數、勝率與績效要提高」，週期維持 30 秒）：同 B 的 Gate 資料，只換參數。
+     Binance QQQ 30 秒 2026-04-06～10-10 掃 64 組（扣每邊 0.01%）：倍數 60 那欄取樣 100～800 全正（+8.5～+16.4%），
+     500/60：92 筆（一天 0.5 筆）、勝率 39%、+16.4%、三段 +5.8／+6.9／+3.8、回落 4.4%；現行 200/23 為 575 筆、勝率 30%、−44.3%；抱著 +23.5%。 */
+  {k:"gate2", pg:"short", title:"那斯達克", tf:"短趨勢・B2", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
+   sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 500・倍數 60（約兩天翻一次）",
+   P:{per:500, mult:60, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.2.0 新增參考格：Hyperliquid 1 分 K 沒有 30 秒，取樣減半成 100、倍數 23÷√2≈16 換算。
      2026-10-08 對 TradingView 30 秒 3 天 7 次翻轉：全對上、平均差不到 1 分、無半夜假翻轉；樣本小，觀察中。
      預設只顯示最近 2,100 根（約 35 小時），跟上面 30 秒那格的時間範圍對齊。 */
@@ -954,6 +960,7 @@ function renderInfo(p){
 const TRADE_K = [
   {k:"A", pk:"rf",     name:"A",    unit:"點"},
   {k:"G", pk:"gate",   name:"B",    unit:"點"},
+  {k:"G2", pk:"gate2", name:"B2",   unit:"點"},   // 2026-10-15 放在 B 正下方，同 Gate 資料、500/60
   {k:"B", pk:"hl",     name:"C",    unit:"點"},
   {k:"C", pk:"nq6",    name:"D",    unit:"點"},
   {k:"C2", pk:"nq6b",  name:"D2",   unit:"點"},   // 2026-10-15 放在 D 正下方，同 D 資料、200/6 多空都做
@@ -1347,12 +1354,12 @@ async function loadGate(p){
   }
   setLoad("gate", null);
   RAW1M[p.sym] = [...all.values()].sort((a, b) => a.t - b.t);
-  p.dirty = true;
+  PANELS.forEach(x => { if(x.sym === p.sym) x.dirty = true; });   // B、B2 共用
 }
 async function pollGate(p){
   if(!RAW1M[p.sym]) return;
   for(const k of await jget(`${GATE_FAPI}/candlesticks?contract=${p.sym}&interval=30s&limit=6`)) mergeKline(p.sym, gk(k));
-  p.dirty = true;
+  PANELS.forEach(x => { if(x.sym === p.sym) x.dirty = true; });
 }
 async function pollHL(p){
   if(!RAW1M[p.sym]) return;
