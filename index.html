@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.9.0</title>
+<title>指數趨勢儀表板 v1.9.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -143,7 +143,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.9.0";
+const VERSION = "v1.9.1";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -463,6 +463,12 @@ const PANELS = [
   {k:"nq6", pg:"long", title:"那斯達克", tf:"中長趨勢・D", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
    sub:"NQ 期貨單一月份合約（同實際紀錄；Yahoo 延遲約 10 分鐘）・Donchian 回看 350 小時（3,500 根）・停損 8 ATR・空手改放空",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:6}},
+  /* D2（使用者 2026-10-15 要求，放在 D 正下方）：同 D 的資料與算法，只換參數 200 小時／停損 6 ATR、空手改放空（不擋）。
+     TradingView NQ1! 6 分 2008-10～2026-10 掃 162 組：200/6 多空都做 +1,064 點（空單 −11,996，2022 空頭年 +3,587），
+     只做多 200/6 +13,060、抱著約 +25,700。使用者認為空頭時代要來，並行觀察。 */
+  {k:"nq6b", pg:"long", title:"那斯達克", tf:"中長趨勢・D2", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
+   sub:"NQ 期貨單一月份合約 6 分（同 D）・Donchian 回看 200 小時（2,000 根）・停損 6 ATR・空手改放空（不擋）",
+   P:{lookH:200, mode:"long", stopAtr:6, atrLen:14, tfMin:6}},
   {k:"gold8", pg:"long", title:"黃金", tf:"中長趨勢・E", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
    P:{lookH:350, mode:"both", stopAtr:8, atrLen:14, tfMin:8}},
@@ -950,6 +956,7 @@ const TRADE_K = [
   {k:"G", pk:"gate",   name:"B",    unit:"點"},
   {k:"B", pk:"hl",     name:"C",    unit:"點"},
   {k:"C", pk:"nq6",    name:"D",    unit:"點"},
+  {k:"C2", pk:"nq6b",  name:"D2",   unit:"點"},   // 2026-10-15 放在 D 正下方，同 D 資料、200/6 多空都做
   {k:"D", pk:"gold8",  name:"E 黃金", unit:"美元", d:2},
   {k:"E", pk:"gold11", name:"F 黃金", unit:"美元", d:2},
   {k:"R30", pk:"atr30", name:"G",    unit:"點"},   // v1.9.0 觀察頁，紀錄 2026-10-14 起算
