@@ -395,7 +395,8 @@ def update(k, B, pos, warm, contract, nqconv=None, min_t=None):
             add(i, action(cur, pos[i]), pos[i]); cur = pos[i]
     return new
 
-# 2026-10-13 起 C、E 格「空手改放空」（使用者指定；紀錄從當天起照新規則，舊列不改）：
+# 2026-10-13 起 C、E 格「空手改放空」（使用者指定）。2026-10-14 使用者要求進場時間與績效跟策略同步，
+# 紀錄已手動回溯至起算日（C 8/18、10/13 08:06 與 E 8/27 改成翻空，刪掉 10/13 15:24 補開的列），switch_rule 不會再觸發：
 # 原規則（只做多）空手的時段一律持空、永遠在場；進出時機不變。儀表板 v1.8.0 的 toFlatShort 同一套。
 # 黃金儀表板「上方」與 LINE 推播仍是只做多，E 格從此跟它們不同。
 def flat_short(pos): return [1 if p == 1 else -1 for p in pos]
