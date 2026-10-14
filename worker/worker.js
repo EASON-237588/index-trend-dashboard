@@ -2,12 +2,13 @@
    Yahoo 不給瀏覽器跨網域讀，所以由這裡轉一手。不存資料：每次向 Yahoo 抓
    5 分 K（約 60 天）＋ 2 分 K（約 36 天），2 分 K 涵蓋不到的前段用 5 分 K 補，
    合併成一串回傳 [t(毫秒), o, h, l, c]。這跟 2026-10-08 對帳 TradingView 用的是同一套抓法。 */
-const SYM = "NQ=F";
+const SYM = "NQ=F";   // 沒帶 ?sym= 時用連續月（舊版網頁）
+const SYM_OK = /^NQ[HMUZ]\d{2}\.CME$/;   // v1.8.5 起網頁指定單一月份合約，只接受這種格式
 const ALLOW = [/^https:\/\/eason-237588\.github\.io$/, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
 const TTL = 60;   // 秒；Yahoo 本身延遲 10 分鐘，快取 1 分鐘沒有差別
 
-async function yahoo(iv, range){
-  const u = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(SYM)}?interval=${iv}&range=${range}&includePrePost=true`;
+async function yahoo(sym, iv, range){
+  const u = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${iv}&range=${range}&includePrePost=true`;
   const r = await fetch(u, {headers: {"User-Agent": "Mozilla/5.0"}});
   if(!r.ok) throw new Error(`Yahoo ${iv} HTTP ${r.status}`);
   const d = (await r.json()).chart.result[0];
@@ -29,15 +30,18 @@ export default {
     const origin = req.headers.get("Origin");
     const url = new URL(req.url);
     if(url.pathname !== "/nq") return new Response("not found", {status: 404});
+    const q = url.searchParams.get("sym");
+    if(q && !SYM_OK.test(q)) return new Response("bad sym", {status: 400, headers: cors(origin)});
+    const sym = q || SYM;
 
-    const cache = caches.default, key = new Request(url.origin + "/nq");
+    const cache = caches.default, key = new Request(url.origin + "/nq" + (q ? "?sym=" + q : ""));
     let res = await cache.match(key);
     if(!res){
       try{
-        const [m5, m2] = await Promise.all([yahoo("5m", "60d"), yahoo("2m", "60d")]);
+        const [m5, m2] = await Promise.all([yahoo(sym, "5m", "60d"), yahoo(sym, "2m", "60d")]);
         const cut = m2.length ? m2[0][0] : Infinity;
         const bars = m5.filter(b => b[0] < cut).concat(m2);
-        res = new Response(JSON.stringify({sym: SYM, at: Date.now(), cut, bars}), {
+        res = new Response(JSON.stringify({sym, at: Date.now(), cut, bars}), {
           headers: {"Content-Type": "application/json", "Cache-Control": `public, max-age=${TTL}`}});
         ctx.waitUntil(cache.put(key, res.clone()));
       }catch(e){
