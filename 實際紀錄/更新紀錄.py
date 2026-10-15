@@ -47,19 +47,22 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 # 2026-10-15 使用者定的原則：短趨勢頁從 10/6、中長趨勢頁（C、C2、D、E）從 7/15 起算，取代下面註解裡的舊起算日。
 # B（畫面 C）是 Hyperliquid，只能回溯約 3.5 天，紀錄早已從 10/8 開始，回不到 10/6，維持 10/8。
 START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 7, 15), "D": ms(2026, 7, 15), "E": ms(2026, 7, 15),
-         "R30": ms(2026, 10, 14), "R1": ms(2026, 10, 14), "R2": ms(2026, 10, 14), "C2": ms(2026, 7, 15), "G2": ms(2026, 10, 6)}
+         "R30": ms(2026, 10, 14), "R1": ms(2026, 10, 14), "R2": ms(2026, 10, 14), "C2": ms(2026, 7, 15), "G2": ms(2026, 10, 6), "G3": ms(2026, 10, 6)}
+# 2026-10-15 晚：使用者要求 B2 符合當初「訊號比 B 少、績效比 B 好」，掃 20～40 秒 × 418 組（10/6 起）後指定
+#   B2（G2）改 37 秒 450/23、新增 B3（G3）22 秒 50/45；舊 G2（30 秒 500/60）列刪除重算。畫面 C 格（B）刪除。
 # G2（畫面 B2，2026-10-15 使用者要求）：同 G 的 Gate 30 秒資料，Range Filter 取樣 500、倍數 60。起算比照 G 的 10/6 方便並排；10/15 以前是回算。
 # C2（畫面 D2，2026-10-15 使用者要求）：同 C 的資料與算法，參數 200 小時／停損 6 ATR、空手改放空。起算比照 C 的 8/15 方便並排；
 # 10/15 以前是回算、不是當時實際記的。換月（12/11）時跟 R2 一樣還不會記換倉。
 # 2026-10-14 使用者要求 D、E 回溯拉到最大：XAUUSDT 2025/12/11 上市、PAXGUSDT 1 分 K 從 2020/08/28，各扣 350 小時暖機。
 # C 維持 8/15：單一月份合約的真 5 分 K 只有 60 天，更早只剩小時 K（9 月約已下市）。
-ORDER = ["A", "G", "G2", "B", "C", "C2", "D", "E", "R30", "R1", "R2"]
+ORDER = ["A", "G", "G2", "G3", "C", "C2", "D", "E", "R30", "R1", "R2"]
 # LABEL 是畫面代號（v1.8.4 起照畫面順序叫 A～F），只用在印績效與曲線圖標題；紀錄檔「格子」欄仍是左邊的內部代號。
-LABEL = {"A": "A", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I", "C2": "D2", "G2": "B2"}
+LABEL = {"A": "A", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I", "C2": "D2", "G2": "B2", "G3": "B3"}
 NAME = {"A": "那斯達克短趨勢（Binance 30 秒，取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢（Gate 30 秒，取樣 200、倍數 23）", "B": "那斯達克短趨勢（1 分，取樣 100、倍數 16）", "C": "那斯達克中長趨勢（6 分，空手放空）", "D": "黃金中長趨勢（8 分）", "E": "黃金中長趨勢（11 分，空手放空）",
         "R30": "那斯達克觀察（30 秒 ATR 反手 60/70＋日線 60）", "R1": "那斯達克觀察（1 分 ATR 反手 60/50＋日線 60）", "R2": "那斯達克觀察（2 分 ATR 反手 60/70＋日線 60）",
         "C2": "那斯達克觀察（6 分，通道 200 小時、停損 6 ATR，空手放空）",
-        "G2": "那斯達克短趨勢（Gate 30 秒，取樣 500、倍數 60）"}
+        "G2": "那斯達克短趨勢（Gate 37 秒，取樣 450、倍數 23）",
+        "G3": "那斯達克短趨勢（Gate 22 秒，取樣 50、倍數 45）"}
 GOLD = ("D", "E")   # 單位是美元/盎司
 
 # C 格合約與換月日（CME 慣例：到期前約一週的週四換到下一季）。過了最後一列要往下加
@@ -172,35 +175,41 @@ def bars_A(since):
             b = B[-1]; b[2] = max(b[2], p); b[3] = min(b[3], p); b[4] = p; b[5] += q
     return [tuple(b) for b in B if b[0] + 30000 <= NOW]
 
-def bars_G(since):
-    """Gate QQQ_USDT 合約逐筆 → 30 秒 K，切法同 bars_A（CME 時段、空檔補平盤）。
-    Gate 原生 30 秒 K 只能回溯約 3.5 天，起算要回到 10/6，所以用逐筆（可回溯至少 30 天）。
+def gate_trades(since):
+    """Gate QQQ_USDT 合約逐筆（可回溯至少 30 天）。每 15 分鐘一段、8 段同時抓；一段滿 1,000 筆就對半切。
     注意：create_time_ms 名稱寫毫秒、實際是「秒」，一律用 create_time × 1000。"""
+    from concurrent.futures import ThreadPoolExecutor
     def page(a, b):
         j = jget(f"https://api.gateio.ws/api/v4/futures/usdt/trades?contract=QQQ_USDT&limit=1000&from={a}&to={b}")
         if len(j) >= 1000 and b - a > 10:
             m = (a + b) // 2
             return page(a, m) + page(m, b)
         return j
-    tr = {}; t = since // 1000; end = NOW // 1000
-    while t < end:
-        for x in page(t, min(end, t + 900)):
-            tr[x["id"]] = (int(float(x["create_time"]) * 1000), float(x["price"]), abs(float(x["size"])))
-        t += 900
-    B = []
-    for T, p, q in sorted(tr.values()):
+    end = NOW // 1000; segs = [(t, min(end, t + 900)) for t in range(since // 1000, end, 900)]
+    tr = {}
+    with ThreadPoolExecutor(8) as ex:
+        for part in ex.map(lambda s: page(*s), segs):
+            for x in part:
+                tr[x["id"]] = (int(float(x["create_time"]) * 1000), float(x["price"]), abs(float(x["size"])))
+    return sorted(tr.values())
+
+def bars_G(since, tf=30, tr=None):
+    """Gate 逐筆 → tf 秒 K，切法同 bars_A（CME 時段、空檔補平盤；時間桶從 1970 起算）。
+    Gate 原生 K 只能回溯約 3.5 天、也沒有 37 秒、22 秒，所以一律用逐筆合成。B 30 秒、B2 37 秒、B3 22 秒共用同一份逐筆。"""
+    ms = tf * 1000; B = []
+    for T, p, q in (tr if tr is not None else gate_trades(since)):
         if T < since or not cme_open(T): continue
-        s = T // 30000 * 30000
+        s = T // ms * ms
         if not B or s > B[-1][0]:
             if B and s - B[-1][0] <= 2 * 3600000:
-                c = B[-1][4]; x = B[-1][0] + 30000
+                c = B[-1][4]; x = B[-1][0] + ms
                 while x < s:
                     if cme_open(x): B.append([x, c, c, c, c, 0.0])
-                    x += 30000
+                    x += ms
             B.append([s, p, p, p, p, q])
         elif s == B[-1][0]:
             b = B[-1]; b[2] = max(b[2], p); b[3] = min(b[3], p); b[4] = p; b[5] += q
-    return [tuple(b) for b in B if b[0] + 30000 <= NOW]
+    return [tuple(b) for b in B if b[0] + ms <= NOW]
 
 def bars_B():
     st = NOW - 5000 * 60000
@@ -561,7 +570,8 @@ if __name__ == "__main__":
     print("抓 B：Hyperliquid 1 分 K")
     BB = bars_B(); posB, wB = calc_rf(BB, 100, 16)
     hl_close = {b[0]: b[4] for b in BB}
-    added += update("B", BB, posB, wB, "xyz:XYZ100"); LAST["B"] = (BB[-1][4], BB[-1][0], None)
+    # 畫面 C 格（B）2026-10-15 使用者刪除：舊列保留、不再更新；Hyperliquid 仍要抓，H 格與那斯達克換算要用
+    LAST["B"] = (BB[-1][4], BB[-1][0], None)
 
     print("抓 A：QQQUSDT 逐筆成交（第一次較久）")
     since = min(last_t("A", START["A"]), last_t("R30", START["R30"]), NOW) - 3 * 86400000   # G 格（R30）共用這份 30 秒線，翻轉較少，要從兩者較早的那筆往前抓
@@ -578,12 +588,17 @@ if __name__ == "__main__":
     # A2 自 2026-10-12 起不再更新（由 G 取代），舊列保留
 
     print("抓 G：Gate QQQ_USDT 逐筆成交（第一次較久）")
-    # B2（G2）共用這份；它暖機要 3,000 根（約 25 個交易小時），第一次從起算日往前多抓 5 天（中間有週末休市）
-    BG = bars_G(min(last_t("G", START["G"]), last_t("G2", START["G2"] - 2 * 86400000), NOW) - 3 * 86400000); posG, wG = calc_rf(BG, 200, 23)
+    # B2（G2，37 秒 450/23）、B3（G3，22 秒 50/45）共用同一份逐筆，各自合成；
+    # B2 暖機約 2,700 根（約 28 個交易小時），第一次從起算日往前多抓 5 天（中間有週末休市）
+    gsince = min(last_t("G", START["G"]), last_t("G2", START["G2"] - 2 * 86400000), last_t("G3", START["G3"] - 2 * 86400000), NOW) - 3 * 86400000
+    GTR = gate_trades(gsince)
+    BG = bars_G(gsince, 30, GTR); posG, wG = calc_rf(BG, 200, 23)
     added += update("G", BG, posG, wG, "QQQ_USDT", nqconv)
     LAST["G"] = (BG[-1][4], BG[-1][0], nqconv(BG[-1][0], BG[-1][4]))
-    posG2, wG2 = calc_rf(BG, 500, 60)
-    added += update("G2", BG, posG2, wG2, "QQQ_USDT", nqconv); LAST["G2"] = LAST["G"]
+    BG2 = bars_G(gsince, 37, GTR); posG2, wG2 = calc_rf(BG2, 450, 23)
+    added += update("G2", BG2, posG2, wG2, "QQQ_USDT", nqconv); LAST["G2"] = (BG2[-1][4], BG2[-1][0], nqconv(BG2[-1][0], BG2[-1][4]))
+    BG3 = bars_G(gsince, 22, GTR); posG3, wG3 = calc_rf(BG3, 50, 45)
+    added += update("G3", BG3, posG3, wG3, "QQQ_USDT", nqconv); LAST["G3"] = (BG3[-1][4], BG3[-1][0], nqconv(BG3[-1][0], BG3[-1][4]))
 
     print("抓 C：Yahoo 那斯達克單一月份合約")
     act = [c for c in C_CONTRACTS if c[2] is None or c[2] <= NOW][-1]
@@ -628,7 +643,7 @@ if __name__ == "__main__":
     posR2, wR2 = calc_atr_rev(BR2, 60, 70, 60, DAILY)
     added += update("R2", BR2, posR2, wR2, act[1]); LAST["R2"] = (BR2[-1][4], BR2[-1][0], None)
 
-    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG}
+    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG2, "G3": BG3}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
