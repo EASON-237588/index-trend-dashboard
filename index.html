@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.13.0</title>
+<title>指數趨勢儀表板 v1.14.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -149,7 +149,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.13.0";
+const VERSION = "v1.14.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -913,7 +913,8 @@ function buildDOM(){
   // v1.13.0 微型那斯達克的手續費、匯率欄位：離開欄位或按 Enter 才生效；匯率清空＝恢復自動
   $("tradeBody").addEventListener("change", e => {
     const v = parseFloat(e.target.value);
-    if(e.target.id === "mnqFee" && v >= 0 && v < 100) MNQ.fee = v;
+    if(e.target.id === "tmfFee"){ if(v >= 0 && v < 1000){ TMF.fee = v; tmfSave(); } }
+    else if(e.target.id === "mnqFee" && v >= 0 && v < 100) MNQ.fee = v;
     else if(e.target.id === "mnqRate"){
       if(e.target.value === ""){ MNQ.rateAuto = true; MNQ.rateAt = 0; mnqRate().catch(() => {}); }
       else if(v > 20 && v < 50){ MNQ.rate = v; MNQ.rateAuto = false; }
@@ -962,7 +963,8 @@ function renderInfo(p){
     const T = TRADE_K.find(x => x.pk === p.k), d = T && T.d || 0;
     const v = (fx(p, last.c) - fx(p, e.price)) * e.side;
     // v1.13.0 那斯達克改顯示微型那斯達克 1 口的台幣（已扣來回手續費），點數放滑鼠提示
-    if(isNQT(T)){ const nt = ntOf(v, 1); flt = `<span class="flt ${ud(Math.round(nt))}" title="${sgn(v)} 點">${ntFmt(nt)}</span>`; }
+    const C = costOf(T);   // v1.14.0 台指也換算（微台）
+    if(C){ const nt = C.nt(v, e.price, last.c); flt = `<span class="flt ${ud(Math.round(nt))}" title="${sgn(v)} 點">${ntFmt(nt)}</span>`; }
     else flt = `<span class="flt ${ud(+v.toFixed(d))}">${sgn(v, d)}</span>`;
   }
   // 下一個會讓部位改變的價位
@@ -1138,19 +1140,33 @@ async function mnqRate(){
   if(d && d.rates && d.rates.TWD > 20 && d.rates.TWD < 50){ MNQ.rate = d.rates.TWD; MNQ.rateAt = Date.now(); mnqSave(); tradeSig = ""; }
 }
 const isNQT = T => T && T.unit === "點" && !T.self;   // 那斯達克各組（台指也是「點」但 self）
-const ntOf = (pts, trips) => (pts * MNQ.mult - trips * 2 * MNQ.fee) * MNQ.rate;   // 點數 → 台幣，扣 trips 次來回
-const ntFmt = v => sgn(v) + " 元";
+/* v1.14.0 台指三格也改看台幣（使用者 10/16 選微台）：微型臺指期貨（TMF）每點 10 元，每邊扣手續費（預設 15 元，
+   網路行情每邊 10～30 元，可在交易明細改）＋期交稅（成交金額十萬分之二、買賣各一次，四捨五入到元）。
+   台指的價格是換月平移過的，期交稅用平移後價格算，差幾毛不影響。 */
+const TMF = {mult:10, fee:15}, TMF_KEY = "itd-tmf-v1";
+try{ Object.assign(TMF, JSON.parse(localStorage.getItem(TMF_KEY) || "{}")); }catch(e){}
+const tmfSave = () => { try{ localStorage.setItem(TMF_KEY, JSON.stringify(TMF)); }catch(e){} };
+const txTax = p => Math.round(p * TMF.mult * 0.00002);
+// 每組的成本規則：nt(點數, 進場價, 出場價) → 一趟扣完成本的台幣；fee(進場價, 出場價) → 這一趟的成本
+function costOf(T){
+  if(isNQT(T)) return {name:"nq", nt:(g, ep, xp) => (g * MNQ.mult - 2 * MNQ.fee) * MNQ.rate, fee:() => 2 * MNQ.fee * MNQ.rate};
+  if(T && T.self) return {name:"tx", nt:(g, ep, xp) => g * TMF.mult - 2 * TMF.fee - txTax(ep) - txTax(xp), fee:(ep, xp) => 2 * TMF.fee + txTax(ep) + txTax(xp)};
+  return null;
+}
+const ntFmt = v => sgn(v);   // 使用者 10/16 要求金額不加「元」字
 function winLine(T, R){
   if(T.unit !== "點" || !R.cnt) return "";
   const w = R.trades.filter(x => Math.round(x.g) >= WIN_PTS).length, rate = w / R.cnt * 100;
   return `<div>勝率 <b class="${rate >= 50 ? "up" : "dn"}">${rate.toFixed(0)}%</b>（贏 ${w}／輸 ${R.cnt - w}，未達 ${WIN_PTS} 點算輸）</div>`;
 }
 // v1.13.0 那斯達克各組：台幣大字、點數小字；逐筆盈虧與累計都是扣過來回手續費的台幣
-function renderTradesNT(T){
-  const R = tradesOf(T), o = R.op, fee1 = 2 * MNQ.fee * MNQ.rate;
-  const realNT = ntOf(R.pts, R.cnt), oNT = o && o.pts != null ? ntOf(o.pts, 1) : null;
+function renderTradesNT(T, C){
+  const R = tradesOf(T), o = R.op;
+  let cum = 0, feeAll = 0;
+  const rows = R.trades.map((x, i) => { const nt = C.nt(x.g, x.ep, x.xp); cum += nt; feeAll += C.fee(x.ep, x.xp); return {x, i: i + 1, nt, cum}; });
+  const realNT = cum, oNT = o && o.pts != null ? C.nt(o.pts, o.p, o.now) : null;
+  if(o) feeAll += C.fee(o.p, o.now != null ? o.now : o.p);
   const tot = realNT + (oNT || 0), totPts = R.pts + (o && o.pts != null ? o.pts : 0);
-  const feeAll = (R.cnt + (o ? 1 : 0)) * fee1;
   const sm = s => `<small style="font-size:11px;font-weight:400;color:var(--mute)">${s}</small>`;
   const hold = !o ? "目前空手"
     : `持有中：<span class="${sideCls(o.side)}">${SIDE_T[o.side]}</span> ${tText(o.t)} @${fmtN(o.p, 0)}` +
@@ -1160,15 +1176,17 @@ function renderTradesNT(T){
     <div class="tot ${ud(Math.round(tot))}">合計 ${ntFmt(tot)} ${sm(sgn(totPts) + " 點" + (o && o.pts == null ? "，不含浮動" : ""))}</div>
     <div>已平倉 ${R.cnt} 筆（賺 ${R.win}／賠 ${R.cnt - R.win}），已實現 <span class="${ud(Math.round(realNT))}">${ntFmt(realNT)}</span> ${sm(sgn(R.pts) + " 點")}</div>${winLine(T, R)}
     <div>${hold}</div>
-    <div>手續費共 ${fmtN(feeAll, 0)} 元（${R.cnt + (o ? 1 : 0)} 次來回，已扣在上面的金額裡）</div></div>
-    <div class="tnote">微型那斯達克 1 口・每點 ${MNQ.mult} 美元・單邊手續費
+    <div>${C.name === "tx" ? "手續費＋期交稅" : "手續費"}共 ${fmtN(feeAll, 0)}（台幣，${R.cnt + (o ? 1 : 0)} 次來回，已扣在上面的金額裡）</div></div>
+    <div class="tnote">${C.name === "tx"
+      ? `微台 1 口・每點 ${TMF.mult} 元・每邊手續費
+      <input id="tmfFee" type="number" step="1" min="0" value="${TMF.fee}" style="width:52px"> 元・期交稅十萬分之二（買賣各一次）<br>
+      未扣滑價・2026/10/06 起回算・期交所每日逐筆檔＋TradingView 即時，資料到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新${TX.roll ? "・換月前的價格已照換月價差平移，盈虧點數不受影響" : ""}`
+      : `微型那斯達克 1 口・每點 ${MNQ.mult} 美元・單邊手續費
       <input id="mnqFee" type="number" step="0.1" min="0" value="${MNQ.fee}" style="width:52px"> 美元・匯率
       <input id="mnqRate" type="number" step="0.01" min="20" max="50" placeholder="${ratePh}" value="${MNQ.rateAuto ? "" : MNQ.rate}" style="width:64px">
       ${MNQ.rateAuto ? `（自動 ${ratePh}）` : "（手動，清空恢復自動）"}<br>
-      未扣滑價・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>` +
+      未扣滑價・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準`}</div>` +
     (R.gap ? `<div class="tnote warn">正式紀錄最後一筆之後隔太久，網頁只能從 ${tText(R.first.t)} 接著算，中間可能漏掉交易；開工跑一次紀錄就會補齊。</div>` : "");
-  let cum = 0;
-  const rows = R.trades.map((x, i) => { const nt = ntOf(x.g, 1); cum += nt; return {x, i: i + 1, nt, cum}; });
   const rowsH = rows.reverse().map(({x, i, nt, cum}) => `<tr class="${x.live ? "live" : ""}">
     <td>${x.live ? "◆" : ""}${i}</td><td class="${sideCls(x.side)}">${SIDE_T[x.side]}</td>
     <td>${tText(x.et)}<br><small>${fmtN(x.ep, 0)}</small></td>
@@ -1177,7 +1195,7 @@ function renderTradesNT(T){
   const holdH = o ? `<tr class="hold${o.live ? " live" : ""}"><td>${o.live ? "◆" : ""}持有</td><td class="${sideCls(o.side)}">${SIDE_T[o.side]}</td>
     <td>${tText(o.t)}<br><small>${fmtN(o.p, 0)}</small></td><td>現價<br><small>${o.now != null ? fmtN(o.now, 0) : "—"}</small></td>
     <td class="${ud(Math.round(oNT || 0))}">${oNT != null ? sgn(oNT) : "—"}<br><small>${o.pts != null ? sgn(o.pts) + " 點" : ""}</small></td><td class="${ud(Math.round(tot))}">${sgn(tot)}</td></tr>` : "";
-  return html + `<table class="tt"><thead><tr><th>#</th><th>方向</th><th>進場</th><th>出場</th><th>盈虧（元）</th><th>累計（元）</th></tr></thead>
+  return html + `<table class="tt"><thead><tr><th>#</th><th>方向</th><th>進場</th><th>出場</th><th>盈虧（台幣）</th><th>累計（台幣）</th></tr></thead>
     <tbody>${holdH}${rowsH}</tbody></table>`;
 }
 function renderTrades(){
@@ -1187,7 +1205,7 @@ function renderTrades(){
   if(T.self && !TX.ready) html = `<div class="tnote">${TX.err || "台指資料載入中…"}</div>`;
   else if(!T.self && !LOGROWS) html = `<div class="tnote">${logErr || "讀取進出紀錄中…"}</div>`;
   else if(!T.self && !LOGROWS.some(r => r.k === T.k)) html = `<div class="tnote">這組還沒有正式紀錄（開工跑一次紀錄後才有）</div>`;
-  else if(isNQT(T)) html = renderTradesNT(T);
+  else if(costOf(T)) html = renderTradesNT(T, costOf(T));
   else{
     const R = tradesOf(T), o = R.op, tot = R.pts + (o && o.pts != null ? o.pts : 0), totP = R.pct + (o && o.pct != null ? o.pct : 0);
     const hold = !o ? "目前空手"
@@ -1212,7 +1230,7 @@ function renderTrades(){
   }
   document.querySelectorAll("#tradeTabs button").forEach(b => b.classList.toggle("on", b.dataset.k === T.k));
   const ae = document.activeElement;
-  if(ae && (ae.id === "mnqFee" || ae.id === "mnqRate")) return;   // 正在輸入時不重畫，不然輸入框會被換掉
+  if(ae && (ae.id === "mnqFee" || ae.id === "mnqRate" || ae.id === "tmfFee")) return;   // 正在輸入時不重畫，不然輸入框會被換掉
   if(html !== tradeSig){ tradeSig = html; $("tradeBody").innerHTML = html; }
 }
 
