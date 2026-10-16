@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.10.0</title>
+<title>指數趨勢儀表板 v1.11.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -42,6 +42,12 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
   .tabs button{padding:3px 6px}
   header .hbtn{padding:3px 6px}
   header .hbtn+.hbtn{margin-left:0}
+  /* v1.11.0 多了「台指」分頁，375 寬時標題列寬 421、交易明細被擠出畫面：字與內距再縮 */
+  header{gap:2px}
+  h1{font-size:14px}
+  h1 small{font-size:10px;margin-left:3px}
+  .tabs button{padding:3px 4px;font-size:11.5px}
+  header .hbtn{padding:3px 5px;font-size:11.5px}
 }
 .status{font-size:11px;color:var(--mute);display:flex;align-items:center;gap:5px;min-width:0;white-space:nowrap;overflow:hidden}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block;flex:none}
@@ -121,7 +127,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 <div class="app">
 <header>
   <h1>指數趨勢儀表板<small id="ver"></small></h1>
-  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="long">中長趨勢</button><button data-pg="obs">觀察</button></div>
+  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="tx">台指</button><button data-pg="long">中長趨勢</button><button data-pg="obs">觀察</button></div>
   <button class="hbtn" id="tradeBtn">交易明細</button>
   <div class="status"><i class="dot" id="dot"></i><span id="stTxt">準備中</span></div>
 </header>
@@ -143,7 +149,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.10.0";
+const VERSION = "v1.11.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -463,6 +469,19 @@ const PANELS = [
    P:{per:450, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   {k:"gate3", pg:"short", title:"那斯達克", tf:"短趨勢・B3", sym:"QQQ_USDT", src:"gtr", tfSec:22, nq:true, kind:"rf", span:1e9,
    sub:"Gate QQQ 合約逐筆合成 22 秒 K・Range Filter 取樣 50・倍數 45",
+   P:{per:50, mult:45, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  /* v1.11.0 台指頁（使用者 2026-10-15 要求，放在短趨勢右邊）：短趨勢 A/B、B2、B3 三組規則套台指期近月（含夜盤）。
+     盤後版：期交所即時行情網站擋跨網域與雲端機房，10/16 實測家裡電腦每秒抓也撐不住（整站打不開兩次），
+     所以改讀 台指/ 底下由 更新台指.py 每天兩次（7:00 補夜盤、17:00 補日盤）從期交所每日逐筆檔合成的 K 線。
+     10/6～10/15 與 tx_short.py 對帳一致：A/B +801、B2 +1,346、B3 +2,348（未扣成本）。 */
+  {k:"tx30", pg:"tx", title:"台指期", tf:"台指・A/B", src:"tx", tfSec:30, nq:false, kind:"rf", span:1e9,
+   sub:"台指期近月（含夜盤）30 秒 K・Range Filter 取樣 200・倍數 23（同短趨勢 A、B 規則）・盤後更新",
+   P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  {k:"tx37", pg:"tx", title:"台指期", tf:"台指・B2", src:"tx", tfSec:37, nq:false, kind:"rf", span:1e9,
+   sub:"台指期近月（含夜盤）37 秒 K・Range Filter 取樣 450・倍數 23（同 B2）・盤後更新",
+   P:{per:450, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  {k:"tx22", pg:"tx", title:"台指期", tf:"台指・B3", src:"tx", tfSec:22, nq:false, kind:"rf", span:1e9,
+   sub:"台指期近月（含夜盤）22 秒 K・Range Filter 取樣 50・倍數 45（同 B3）・盤後更新",
    P:{per:50, mult:45, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   // v1.1.0 起改用 Yahoo 真 NQ 期貨（經中繼站），價格本身就是 NQ 點數，不換算
   {k:"nq6", pg:"long", title:"那斯達克", tf:"中長趨勢・D", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
@@ -822,6 +841,11 @@ function recompute(p){
       p.span = Math.max(30, B.filter(b => b.t >= t0).length);
       if(!p.userZoom) p.view.span = p.span;
     }
+  }else if(p.src === "tx"){
+    // v1.11.0 台指：盤後資料檔，每根都已收完
+    if(!TX.ready) return;
+    B = TX.bars[p.tfSec]; p.done = B.length;
+    if(!p.userZoom) p.view.span = p.span = TX.span[p.tfSec];
   }else if(p.src === "hl"){
     // 只留 CME 交易時段，跟 30 秒那格與 TradingView 的切法一致
     const raw = RAW1M[p.sym]; if(!raw) return;
@@ -955,7 +979,9 @@ function renderInfo(p){
   }
   $("px-" + p.k).innerHTML = fmtP(p, last.c);
   const parts = [];
-  if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, `<b>${durText(Date.now() - e.t)}</b>`);
+  // 台指是盤後資料，持有時間算到現在不準；改放「資料到幾點」，手機上才不會被截掉
+  if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, p.src === "tx" ? `盤後到 <b>${tText(last.t)}</b>` : `<b>${durText(Date.now() - e.t)}</b>`);
+  else if(p.src === "tx") parts.push(`盤後到 <b>${tText(last.t)}</b>`);
   parts.push(`${trigK} <b>${trig}</b>`);
   $("kv-" + p.k).innerHTML = `<span class="kvt">${parts.join(" · ")}</span>` + flt;
 }
@@ -975,6 +1001,10 @@ const TRADE_K = [
   {k:"C2", pk:"nq6b",  name:"D2",   unit:"點"},   // 2026-10-15 放在 D 正下方，同 D 資料、200/6 多空都做
   {k:"D", pk:"gold8",  name:"E 黃金", unit:"美元", d:2},
   {k:"E", pk:"gold11", name:"F 黃金", unit:"美元", d:2},
+  // v1.11.0 台指三組：沒有正式紀錄檔，從 10/6 起整段用格子自己算的部位（self）
+  {k:"TX1", pk:"tx30", name:"台指 A/B", unit:"點", self:true},
+  {k:"TX2", pk:"tx37", name:"台指 B2", unit:"點", self:true},
+  {k:"TX3", pk:"tx22", name:"台指 B3", unit:"點", self:true},
   {k:"R30", pk:"atr30", name:"G",    unit:"點"},   // v1.9.0 觀察頁，紀錄 2026-10-14 起算
   {k:"R1",  pk:"atr1",  name:"H",    unit:"點"},
   {k:"R2",  pk:"atr2",  name:"I",    unit:"點"},
@@ -1014,7 +1044,16 @@ async function loadLog(){
   logBusy = false; tradeSig = ""; renderTrades();
 }
 function tradesOf(T){
-  const p = PAN(T.pk), rows = LOGROWS.filter(r => r.k === T.k).map(r => Object.assign({}, r));
+  const p = PAN(T.pk);
+  let rows;
+  if(T.self){
+    // 台指：起算那根（10/6 第一根、且已過暖機）的部位當「起算持有」，之後逐根照格子的部位接著算
+    rows = [];
+    if(p.ready && p.R && p.done){
+      const s = p.bars.findIndex((b, i) => i >= p.R.warm && b.t >= TX_START);
+      if(s >= 0) rows.push({k:T.k, t:p.bars[s].t, act:"起算持有", side:p.R.pos[s], p:p.bars[s].c, nq:null, note:""});
+    }
+  }else rows = LOGROWS.filter(r => r.k === T.k).map(r => Object.assign({}, r));
   // 換算那斯達克點數：照 更新紀錄.py 的 nqconv，用當時那一分鐘（往前找 30 分鐘內）的 Hyperliquid 收盤÷當根價格，
   // 找不到才用現在的比例。用現在的比例會跟正式紀錄差 10 點以上（盈虧點數不受影響，算法是漲跌 %×進場點數）。
   const hl = RAW1M["xyz:XYZ100"] || [];
@@ -1029,11 +1068,11 @@ function tradesOf(T){
   let gap = false;
   if(ready && rows.length){
     const B = p.bars, pos = p.R.pos, n = p.done, lo = p.R.warm;
-    const from = Math.max(rows[rows.length-1].t, LOGCOVER[T.k] || 0);
+    const from = Math.max(rows[rows.length-1].t, T.self ? 0 : LOGCOVER[T.k] || 0);
     let cur = rows[rows.length-1].side, s = B.findIndex(b => b.t > from);
     if(s < 0 || s > n) s = n;
     if(s < lo){ gap = true; s = lo; }   // 正式紀錄之後的缺口比網頁抓到的資料還長，中間可能漏
-    const add = (i, side, note) => rows.push({k:T.k, t:B[i].t, act:"", side, p:B[i].c, nq:p.nq ? conv(B[i].c, B[i].t) : null, note, live:true});
+    const add = (i, side, note) => rows.push({k:T.k, t:B[i].t, act:"", side, p:B[i].c, nq:p.nq ? conv(B[i].c, B[i].t) : null, note, live:!T.self});
     const j = s - 1;
     if(j >= lo && j < n && pos[j] !== cur){ add(s < n ? s : j, pos[j], "校正"); cur = pos[j]; }
     for(let i = s; i < n; i++) if(pos[i] !== cur){ add(i, pos[i], ""); cur = pos[i]; }
@@ -1080,8 +1119,9 @@ function renderTrades(){
   if($("tradeSheet").hidden) return;
   const T = TRADE_K.find(x => x.k === tradeK) || TRADE_K[0], d = T.d || 0, u = T.unit;
   let html;
-  if(!LOGROWS) html = `<div class="tnote">${logErr || "讀取進出紀錄中…"}</div>`;
-  else if(!LOGROWS.some(r => r.k === T.k)) html = `<div class="tnote">這組還沒有正式紀錄（開工跑一次紀錄後才有）</div>`;
+  if(T.self && !TX.ready) html = `<div class="tnote">${TX.err || "台指資料載入中…"}</div>`;
+  else if(!T.self && !LOGROWS) html = `<div class="tnote">${logErr || "讀取進出紀錄中…"}</div>`;
+  else if(!T.self && !LOGROWS.some(r => r.k === T.k)) html = `<div class="tnote">這組還沒有正式紀錄（開工跑一次紀錄後才有）</div>`;
   else{
     const R = tradesOf(T), o = R.op, tot = R.pts + (o && o.pts != null ? o.pts : 0), totP = R.pct + (o && o.pct != null ? o.pct : 0);
     const hold = !o ? "目前空手"
@@ -1091,7 +1131,7 @@ function renderTrades(){
       <div class="tot ${ud(tot)}">合計 ${sgn(tot)} ${u}（${sgn(totP, 2)}%）${o && o.pts == null ? '<small style="font-size:11px;font-weight:400;color:var(--mute)">　不含浮動</small>' : ""}</div>
       <div>已平倉 ${R.cnt} 筆（賺 ${R.win}／賠 ${R.cnt - R.win}），已實現 <span class="${ud(R.pts)}">${sgn(R.pts)} ${u}（${sgn(R.pct, 2)}%）</span></div>${winLine(T, R)}
       <div>${hold}</div></div>
-      <div class="tnote">未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>` +
+      <div class="tnote">${T.self ? `未扣手續費・2026/10/06 起回算・盤後版：期交所每日逐筆檔，資料到 ${R.ready ? tText(R.upTo) : "—"}（每天 7:00 補夜盤、17:00 補日盤）${TX.roll ? "・換月前的價格已照換月價差平移，盈虧點數不受影響" : ""}</div>` : `未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>`}` +
       (R.gap ? `<div class="tnote warn">正式紀錄最後一筆之後隔太久，網頁只能從 ${tText(R.first.t)} 接著算，中間可能漏掉交易；開工跑一次紀錄就會補齊。</div>` : "");
     const rowsH = R.trades.map((x, i) => ({x, i: i + 1})).reverse().map(({x, i}) => `<tr class="${x.live ? "live" : ""}">
       <td>${x.live ? "◆" : ""}${i}</td><td class="${sideCls(x.side)}">${SIDE_T[x.side]}</td>
@@ -1449,6 +1489,40 @@ function gtrSave(){
   for(const tf of GTR_TFS) bars[tf] = GTR.bars[tf].map(b => [b.t, r(b.o), r(b.h), r(b.l), r(b.c), Math.round(b.v)]);
   try{ localStorage.setItem(GTR_KEY, JSON.stringify({at:GTR.lastT, bars})); }catch(e){}
 }
+/* ============ v1.11.0 台指（盤後版） ============
+   台指/index.json 是總表（各交易日的近月合約、最後價、當時次月價），台指/日/YYYYMMDD.json 是那天合成好的 30／37／22 秒 K，
+   每根 6 個整數：距上一根幾根、開−上一根收、高−開、開−低、收−開、量（更新台指.py 的 encode）。
+   換月：畫面用最後一天的近月；舊約那幾天的 K 整段加上「舊約最後一天收盤時 次月價−舊約價」（往回調整），盈虧點數不變。 */
+const TX = {bars:{}, span:{}, ready:false, upd:"", err:"", roll:false}, TX_START = Date.UTC(2026, 9, 5, 16);   // 台北 10/06 00:00
+function txDecode(a, tf, adj){
+  const B = [], ms = tf * 1000; let t = a.length ? a[0] : 0, pc = 0;
+  for(let i = 1; i < a.length; i += 6){
+    t += a[i] * ms; const o = a[i+1] + pc, c = o + a[i+4];
+    B.push({t, o:o + adj, h:o + a[i+2] + adj, l:o - a[i+3] + adj, c:c + adj, v:a[i+5]}); pc = c;
+  }
+  return B;
+}
+async function loadTX(){
+  const idx = await jget("台指/index.json?t=" + Date.now());
+  if(TX.ready && idx.upd === TX.upd) return;
+  const days = idx.days, files = await Promise.all(days.map(x => jget(`台指/日/${x.d}.json?u=${encodeURIComponent(idx.upd)}`)));
+  // 由新往舊累加換月價差
+  const adj = new Array(days.length).fill(0); let roll = false;
+  for(let i = days.length - 2; i >= 0; i--){
+    adj[i] = adj[i+1];
+    if(days[i].c !== days[i+1].c && days[i].nx != null){ adj[i] += days[i].nx - days[i].last; roll = true; }
+  }
+  for(const tf of idx.tfs){
+    const B = [];
+    files.forEach((f, i) => { for(const b of txDecode(f.b[tf], tf, adj[i])) B.push(b); });
+    TX.bars[tf] = B;
+    // 預設顯示最後兩個交易日（含夜盤）
+    const t0 = files.length > 1 ? (txDecode(files[files.length-2].b[tf], tf, 0)[0] || {t:0}).t : 0;
+    TX.span[tf] = Math.max(30, B.filter(b => b.t >= t0).length);
+  }
+  TX.upd = idx.upd; TX.roll = roll; TX.ready = true; TX.err = "";
+  PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; });
+}
 async function pollHL(p){
   if(!RAW1M[p.sym]) return;
   for(const b of await hlCandles(p.sym, Date.now() - 10 * 60000)) mergeKline(p.sym, b);
@@ -1484,6 +1558,7 @@ async function main(){
       loadGTR().catch(e => { for(const k of ["gate2", "gate3"]) $("wait-" + k).textContent = "Gate 逐筆合成失敗：" + e.message + "，請重新整理"; setLoad("gtr", null); }),
       // C 格 v1.10.0 刪除；Hyperliquid 仍要抓：H 格與交易明細的那斯達克換算要用
       loadHL(PAN("atr1")).catch(e => { $("wait-atr1").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
+      loadTX().catch(e => { TX.err = "台指資料載入失敗：" + e.message + "，請重新整理"; for(const k of ["tx30", "tx37", "tx22"]) $("wait-" + k).textContent = TX.err; }),
       loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
   }catch(e){
@@ -1502,6 +1577,7 @@ async function main(){
   setInterval(() => { pollGTR().catch(() => {}); }, 10000);
   setInterval(gtrSave, 60000);
   setInterval(() => { loadDaily().catch(() => {}); }, 1800000);
+  setInterval(() => { loadTX().catch(() => {}); }, 600000);   // 台指盤後資料：每 10 分鐘看總表有沒有更新
   setInterval(() => { pollSpot(PAN("gold11")).catch(() => {}); }, 20000);
   setInterval(() => { pollGate(PAN("gate")).catch(() => {}); }, 10000);
 }
