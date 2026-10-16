@@ -126,8 +126,11 @@ def main():
         d += timedelta(days=1)
     idx["days"].sort(key=lambda x: x["d"]); idx["none"] = sorted(none)
     last = idx["days"][-1] if idx["days"] else None
-    idx["upd"] = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     idx["tfs"] = list(TFS); idx["start"] = "20261006"
+    # 資料真的有變才改更新時間（網頁靠它判斷要不要重讀），不然每次排程都會多一筆沒內容的提交
+    old = json.load(open(INDEX, encoding="utf-8")) if os.path.exists(INDEX) else {}
+    same = {k: v for k, v in old.items() if k != "upd"} == {k: v for k, v in idx.items() if k != "upd"}
+    idx["upd"] = old.get("upd") if same and old.get("upd") else datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
     json.dump(idx, open(INDEX, "w", encoding="utf-8", newline="\n"), ensure_ascii=False, indent=1)
     print(f"新增 {new} 天；資料到 {datetime.fromtimestamp(last['lt'] / 1000, TZ):%m/%d %H:%M}，近月 {last['c']}" if last else "沒有資料")
     return new
