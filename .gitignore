@@ -2,3 +2,5 @@ index.html.bak*
 __pycache__/
 worker/.wrangler/
 報告/
+worker-tx/.wrangler/
+worker-tx/.dev.vars

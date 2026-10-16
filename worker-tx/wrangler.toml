@@ -1,0 +1,11 @@
+name = "index-trend-tx"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[[durable_objects.bindings]]
+name = "TX"
+class_name = "TxStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TxStore"]

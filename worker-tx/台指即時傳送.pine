@@ -1,0 +1,19 @@
+//@version=6
+// 指數趨勢儀表板・台指即時傳送
+// 掛在台指期 1 秒圖。每根 1 秒 K 收盤記下來，滿 15 秒打包成一則警報送到台指轉接站。
+// 警報設定：條件選這支腳本的「任何 alert() 函式呼叫」，通知只勾「網址」，
+// 網址填 https://index-trend-tx.eason-237588.workers.dev/tx/push?k=密碼（密碼在 worker-tx\.dev.vars，不進版控）。
+// 每 15 秒一次是因為 TradingView 對太頻繁觸發的警報會自動停用。
+// 刻意寫成幾乎沒有縮排：用程式塞進 TradingView 編輯器時，縮排會一行一行疊加亂掉。
+indicator("台指即時傳送", overlay = true)
+var string buf = ""
+var int last = 0
+ok = barstate.isrealtime and barstate.isconfirmed
+s = "[" + str.tostring(math.floor(time / 1000)) + "," + str.tostring(open) + "," + str.tostring(high) + "," + str.tostring(low) + "," + str.tostring(close) + "," + str.tostring(nz(volume)) + "]"
+buf := ok ? (buf == "" ? s : buf + "," + s) : buf
+send = ok and time_close - last >= 15000
+msg = "{\"s\":\"" + syminfo.ticker +"\",\"b\":[" + buf + "]}"
+buf := send ? "" : buf
+last := send ? time_close : last
+if send
+    alert(msg, alert.freq_all)
