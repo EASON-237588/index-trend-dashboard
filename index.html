@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.11.0</title>
+<title>指數趨勢儀表板 v1.12.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -149,7 +149,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.11.0";
+const VERSION = "v1.12.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -475,13 +475,13 @@ const PANELS = [
      所以改讀 台指/ 底下由 更新台指.py 每天兩次（7:00 補夜盤、17:00 補日盤）從期交所每日逐筆檔合成的 K 線。
      10/6～10/15 與 tx_short.py 對帳一致：A/B +801、B2 +1,346、B3 +2,348（未扣成本）。 */
   {k:"tx30", pg:"tx", title:"台指期", tf:"台指・A/B", src:"tx", tfSec:30, nq:false, kind:"rf", span:1e9,
-   sub:"台指期近月（含夜盤）30 秒 K・Range Filter 取樣 200・倍數 23（同短趨勢 A、B 規則）・盤後更新",
+   sub:"台指期近月（含夜盤）30 秒 K・Range Filter 取樣 200・倍數 23（同短趨勢 A、B 規則）・盤後檔＋TradingView 即時",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   {k:"tx37", pg:"tx", title:"台指期", tf:"台指・B2", src:"tx", tfSec:37, nq:false, kind:"rf", span:1e9,
-   sub:"台指期近月（含夜盤）37 秒 K・Range Filter 取樣 450・倍數 23（同 B2）・盤後更新",
+   sub:"台指期近月（含夜盤）37 秒 K・Range Filter 取樣 450・倍數 23（同 B2）・盤後檔＋TradingView 即時",
    P:{per:450, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   {k:"tx22", pg:"tx", title:"台指期", tf:"台指・B3", src:"tx", tfSec:22, nq:false, kind:"rf", span:1e9,
-   sub:"台指期近月（含夜盤）22 秒 K・Range Filter 取樣 50・倍數 45（同 B3）・盤後更新",
+   sub:"台指期近月（含夜盤）22 秒 K・Range Filter 取樣 50・倍數 45（同 B3）・盤後檔＋TradingView 即時",
    P:{per:50, mult:45, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   // v1.1.0 起改用 Yahoo 真 NQ 期貨（經中繼站），價格本身就是 NQ 點數，不換算
   {k:"nq6", pg:"long", title:"那斯達克", tf:"中長趨勢・D", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
@@ -842,9 +842,10 @@ function recompute(p){
       if(!p.userZoom) p.view.span = p.span;
     }
   }else if(p.src === "tx"){
-    // v1.11.0 台指：盤後資料檔，每根都已收完
+    // v1.11.0 台指：盤後資料檔，每根都已收完；v1.12.0 接上即時 K，最後一根要等後面有新的 1 秒 K 才算收完
     if(!TX.ready) return;
     B = TX.bars[p.tfSec]; p.done = B.length;
+    if(TX.liveN[p.tfSec] && TX.live.length && B[B.length-1].t + p.tfSec * 1000 > TX.live[TX.live.length-1][0] * 1000) p.done = B.length - 1;
     if(!p.userZoom) p.view.span = p.span = TX.span[p.tfSec];
   }else if(p.src === "hl"){
     // 只留 CME 交易時段，跟 30 秒那格與 TradingView 的切法一致
@@ -979,9 +980,10 @@ function renderInfo(p){
   }
   $("px-" + p.k).innerHTML = fmtP(p, last.c);
   const parts = [];
-  // 台指是盤後資料，持有時間算到現在不準；改放「資料到幾點」，手機上才不會被截掉
-  if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, p.src === "tx" ? `盤後到 <b>${tText(last.t)}</b>` : `<b>${durText(Date.now() - e.t)}</b>`);
-  else if(p.src === "tx") parts.push(`盤後到 <b>${tText(last.t)}</b>`);
+  // 台指是盤後資料，持有時間算到現在不準；改放「資料到幾點」，手機上才不會被截掉（v1.12.0 有即時 K 時寫「即時到」）
+  const txTo = p.src === "tx" ? `${TX.liveN[p.tfSec] ? "即時到" : "盤後到"} <b>${tText(last.t)}</b>` : "";
+  if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, p.src === "tx" ? txTo : `<b>${durText(Date.now() - e.t)}</b>`);
+  else if(p.src === "tx") parts.push(txTo);
   parts.push(`${trigK} <b>${trig}</b>`);
   $("kv-" + p.k).innerHTML = `<span class="kvt">${parts.join(" · ")}</span>` + flt;
 }
@@ -1131,7 +1133,7 @@ function renderTrades(){
       <div class="tot ${ud(tot)}">合計 ${sgn(tot)} ${u}（${sgn(totP, 2)}%）${o && o.pts == null ? '<small style="font-size:11px;font-weight:400;color:var(--mute)">　不含浮動</small>' : ""}</div>
       <div>已平倉 ${R.cnt} 筆（賺 ${R.win}／賠 ${R.cnt - R.win}），已實現 <span class="${ud(R.pts)}">${sgn(R.pts)} ${u}（${sgn(R.pct, 2)}%）</span></div>${winLine(T, R)}
       <div>${hold}</div></div>
-      <div class="tnote">${T.self ? `未扣手續費・2026/10/06 起回算・盤後版：期交所每日逐筆檔，資料到 ${R.ready ? tText(R.upTo) : "—"}（每天 7:00 補夜盤、17:00 補日盤）${TX.roll ? "・換月前的價格已照換月價差平移，盈虧點數不受影響" : ""}</div>` : `未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>`}` +
+      <div class="tnote">${T.self ? `未扣手續費・2026/10/06 起回算・期交所每日逐筆檔（每天 7:00 補夜盤、17:00 補日盤）＋TradingView 即時，資料到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新${TX.roll ? "・換月前的價格已照換月價差平移，盈虧點數不受影響" : ""}</div>` : `未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>`}` +
       (R.gap ? `<div class="tnote warn">正式紀錄最後一筆之後隔太久，網頁只能從 ${tText(R.first.t)} 接著算，中間可能漏掉交易；開工跑一次紀錄就會補齊。</div>` : "");
     const rowsH = R.trades.map((x, i) => ({x, i: i + 1})).reverse().map(({x, i}) => `<tr class="${x.live ? "live" : ""}">
       <td>${x.live ? "◆" : ""}${i}</td><td class="${sideCls(x.side)}">${SIDE_T[x.side]}</td>
@@ -1493,7 +1495,52 @@ function gtrSave(){
    台指/index.json 是總表（各交易日的近月合約、最後價、當時次月價），台指/日/YYYYMMDD.json 是那天合成好的 30／37／22 秒 K，
    每根 6 個整數：距上一根幾根、開−上一根收、高−開、開−低、收−開、量（更新台指.py 的 encode）。
    換月：畫面用最後一天的近月；舊約那幾天的 K 整段加上「舊約最後一天收盤時 次月價−舊約價」（往回調整），盈虧點數不變。 */
-const TX = {bars:{}, span:{}, ready:false, upd:"", err:"", roll:false}, TX_START = Date.UTC(2026, 9, 5, 16);   // 台北 10/06 00:00
+const TX = {bars:{}, span:{}, base:{}, baseSpan:{}, ready:false, upd:"", err:"", roll:false,
+            live:[], liveN:{}, liveAt:0}, TX_START = Date.UTC(2026, 9, 5, 16);   // 台北 10/06 00:00
+/* v1.12.0 台指即時：TradingView 台指期 1 秒圖掛「台指即時傳送」腳本，警報每約 15 秒把 1 秒 K 送到轉接站 index-trend-tx
+   （worker-tx\，只留 3 天）。這裡每 10 秒拿盤後檔最後一根之後的 1 秒 K，照 更新台指.py 的 bars() 同一套切法合成
+   30／37／22 秒 K 接在盤後資料後面：以 1970 起整數秒切桶、只算交易時段、同一段開盤內 2 小時內沒成交補平盤 K。
+   1 秒 K 一定整根落在某個桶裡，所以開高低收跟盤後逐筆合成的一致（量也一致）。
+   即時 K 一律當最新合約、不做換月平移；TradingView 的 TXF1! 何時換月跟盤後檔的「第三個星期三」可能差一天，換月那天要看一下。 */
+const TX_LIVE = "https://index-trend-tx.eason-237588.workers.dev/tx";
+function txOpen(t){   // 同 更新台指.py 的 tx_open（台北時間）
+  const d = new Date(t + 8 * 3600000), wd = (d.getUTCDay() + 6) % 7, hm = d.getUTCHours() * 60 + d.getUTCMinutes();
+  if(hm < 300) return wd >= 1 && wd <= 5;
+  if(hm >= 525 && hm < 825) return wd < 5;
+  if(hm >= 900) return wd < 5;
+  return false;
+}
+function txLiveBars(tf, base){
+  const ms = tf * 1000, seed = base.length ? base[base.length-1] : null, B = seed ? [Object.assign({}, seed)] : [];
+  for(const [ts, o, h, l, c, v] of TX.live){
+    const t = ts * 1000;
+    if(!txOpen(t)) continue;
+    const s = Math.floor(t / ms) * ms;
+    if(seed && s <= seed.t) continue;   // 盤後檔已經有的時段不重複
+    const L = B[B.length-1];
+    if(!L || s > L.t){
+      if(L && s - L.t <= 2 * 3600000) for(let x = L.t + ms; x < s; x += ms) if(txOpen(x)) B.push({t:x, o:L.c, h:L.c, l:L.c, c:L.c, v:0});
+      B.push({t:s, o, h, l, c, v});
+    }else{ L.h = Math.max(L.h, h); L.l = Math.min(L.l, l); L.c = c; L.v += v; }
+  }
+  return seed ? B.slice(1) : B;
+}
+function txMerge(){
+  for(const tf in TX.base){
+    const L = txLiveBars(+tf, TX.base[tf]);
+    TX.bars[tf] = TX.base[tf].concat(L); TX.liveN[tf] = L.length; TX.span[tf] = TX.baseSpan[tf] + L.length;
+  }
+  PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; });
+}
+async function pollTXL(){
+  const since = TX.live.length ? TX.live[TX.live.length-1][0] - 60 : 0;   // 往回多拿 1 分鐘，防同一秒後來又更新
+  const d = await jget(`${TX_LIVE}?since=${since}`);
+  const m = new Map(TX.live.map(b => [b[0], b]));
+  for(const b of d.bars) m.set(b[0], b);
+  TX.live = [...m.values()].sort((a, b) => a[0] - b[0]);
+  TX.liveAt = d.at * 1000;
+  if(TX.ready) txMerge();
+}
 function txDecode(a, tf, adj){
   const B = [], ms = tf * 1000; let t = a.length ? a[0] : 0, pc = 0;
   for(let i = 1; i < a.length; i += 6){
@@ -1515,13 +1562,13 @@ async function loadTX(){
   for(const tf of idx.tfs){
     const B = [];
     files.forEach((f, i) => { for(const b of txDecode(f.b[tf], tf, adj[i])) B.push(b); });
-    TX.bars[tf] = B;
+    TX.base[tf] = B;
     // 預設顯示最後兩個交易日（含夜盤）
     const t0 = files.length > 1 ? (txDecode(files[files.length-2].b[tf], tf, 0)[0] || {t:0}).t : 0;
-    TX.span[tf] = Math.max(30, B.filter(b => b.t >= t0).length);
+    TX.baseSpan[tf] = Math.max(30, B.filter(b => b.t >= t0).length);
   }
   TX.upd = idx.upd; TX.roll = roll; TX.ready = true; TX.err = "";
-  PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; });
+  txMerge();
 }
 async function pollHL(p){
   if(!RAW1M[p.sym]) return;
@@ -1559,6 +1606,7 @@ async function main(){
       // C 格 v1.10.0 刪除；Hyperliquid 仍要抓：H 格與交易明細的那斯達克換算要用
       loadHL(PAN("atr1")).catch(e => { $("wait-atr1").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
       loadTX().catch(e => { TX.err = "台指資料載入失敗：" + e.message + "，請重新整理"; for(const k of ["tx30", "tx37", "tx22"]) $("wait-" + k).textContent = TX.err; }),
+      pollTXL().catch(() => {}),   // 即時 K 拿不到時照舊只顯示盤後資料
       loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
   }catch(e){
@@ -1578,6 +1626,7 @@ async function main(){
   setInterval(gtrSave, 60000);
   setInterval(() => { loadDaily().catch(() => {}); }, 1800000);
   setInterval(() => { loadTX().catch(() => {}); }, 600000);   // 台指盤後資料：每 10 分鐘看總表有沒有更新
+  setInterval(() => { pollTXL().catch(() => {}); }, 10000);   // v1.12.0 台指即時 K（TradingView 約 15 秒送一批）
   setInterval(() => { pollSpot(PAN("gold11")).catch(() => {}); }, 20000);
   setInterval(() => { pollGate(PAN("gate")).catch(() => {}); }, 10000);
 }
