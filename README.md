@@ -1,4 +1,4 @@
-# 指數趨勢儀表板
+# 期貨趨勢
 
 那斯達克 30 秒 Range Filter、那斯達克 6 分與黃金 8 分 Donchian 的即時趨勢訊號。單檔 `index.html`，純前端、免金鑰，雙擊或開 GitHub Pages 即可使用。
 
