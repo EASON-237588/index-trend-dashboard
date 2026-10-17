@@ -1,5 +1,6 @@
 // 期貨趨勢・短趨勢 Range Filter（照儀表板 index.html 的 calcRF 逐行移植）
-// 2026-10-17 建立。用途：把 B、B2、B3 與台指 A/B、B2、B3 六組搬上 TradingView 版面 848。
+// 2026-10-17 建立；v1.0.1 濾網線改照持倉上色（多紅、空綠、空手灰），與儀表板一致。
+// 用途：把 B、B2、B3 與台指 A/B、B2、B3 六組搬上 TradingView 版面 848。
 //
 // TradingView 的秒數圖只有 1／5／10／15／30／45 秒（自訂間隔沒有「秒」這個類型，實測過），
 // 所以改成「同樣時間長度、換算取樣週期」，六格都用 30 秒：
@@ -50,7 +51,7 @@ ci := longSig ? 1 : shortSig ? -1 : pci
 go = bar_index >= warmX * per
 dirNow = go and longSig and pci == -1 ? 1 : go and shortSig and pci == 1 ? -1 : 0
 posCol = strategy.position_size > 0 ? color.new(#ff3b3b, 0) : strategy.position_size < 0 ? color.new(#4cff00, 0) : color.new(#7a8494, 0)
-plot(filt, "濾網線", color=color.new(#ffd400, 0), linewidth=2)
+plot(filt, "濾網線", color=posCol, linewidth=2)
 barcolor(posCol)
 if dirNow != 0
     strategy.entry(dirNow > 0 ? "多" : "空", dirNow > 0 ? strategy.long : strategy.short)
