@@ -1,0 +1,56 @@
+// 期貨趨勢・短趨勢 Range Filter（照儀表板 index.html 的 calcRF 逐行移植）
+// 2026-10-17 建立。用途：把 B、B2、B3 與台指 A/B、B2、B3 六組搬上 TradingView 版面 848。
+//
+// TradingView 的秒數圖只有 1／5／10／15／30／45 秒（自訂間隔沒有「秒」這個類型，實測過），
+// 所以改成「同樣時間長度、換算取樣週期」，六格都用 30 秒：
+//   B／台指 A/B   30 秒 × 200 ＝ 6,000 秒   → 取樣 200、倍數 23（跟儀表板完全一樣）
+//   B2／台指 B2   37 秒 × 450 ＝ 16,650 秒  → 取樣 555、倍數 23
+//   B3／台指 B3   22 秒 × 50  ＝ 1,100 秒   → 取樣 37、倍數 45
+// 取樣週期換算是精確的；倍數不是——濾網帶寬＝倍數 ×「每根 K 的平均跳動」，K 棒大小變了跳動就變。
+// B3 由 22 秒變 30 秒，帶寬會寬約一成五，要用筆數跟儀表板對照後再微調倍數。
+//
+// 屬性要自己設（skill tradingview-strategy-lab 第一節）：
+//   佣金：微型那斯達克單邊 2.5 美元／微台每邊 15 元＋期交稅；訂單大小固定 1 口；
+//   不開止損止盈；圖表要一般 K 線，不能是平均 K 線。
+//
+// 寫法說明：整份只有最後一行需要縮排，這樣貼進 Pine 編輯器時縮排不會一路疊加。
+//@version=6
+strategy("期貨趨勢 RF", overlay=true, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, initial_capital=100000, calc_on_every_tick=false)
+per = input.int(200, "取樣週期", minval=1)
+mult = input.float(23, "範圍倍數", minval=0.1, step=0.5)
+useAtr = input.bool(true, "ATR 過濾")
+atrLen = input.int(12, "ATR 長度")
+atrMult = input.float(1.5, "ATR 倍數", step=0.1)
+useVol = input.bool(true, "成交量過濾")
+volLen = input.int(20, "成交量平均長度")
+warmX = input.int(6, "暖機倍數（暖機根數＝取樣 × 這個數）", minval=0)
+src = hl2
+diff = math.abs(src - src[1])
+avrng = ta.ema(diff, per)
+smrng = ta.ema(avrng, per * 2 - 1) * mult
+var float filt = na
+pv = nz(filt)
+filt := src > pv ? (src - smrng < pv ? pv : src - smrng) : (src + smrng > pv ? pv : src + smrng)
+var int up = 0
+var int dn = 0
+up := filt > filt[1] ? up + 1 : filt < filt[1] ? 0 : up
+dn := filt < filt[1] ? dn + 1 : filt > filt[1] ? 0 : dn
+moved = src != src[1]
+longCond = src > filt and moved and up > 0
+shortCond = src < filt and moved and dn > 0
+atrV = ta.atr(atrLen)
+longF = not useAtr or close > close - atrV * atrMult
+shortF = not useAtr or close < close + atrV * atrMult
+volOK = not useVol or volume > ta.sma(volume, volLen) * 0.8
+longSig = longCond and longF and volOK
+shortSig = shortCond and shortF and volOK
+var int ci = 0
+pci = ci
+ci := longSig ? 1 : shortSig ? -1 : pci
+go = bar_index >= warmX * per
+dirNow = go and longSig and pci == -1 ? 1 : go and shortSig and pci == 1 ? -1 : 0
+posCol = strategy.position_size > 0 ? color.new(#ff3b3b, 0) : strategy.position_size < 0 ? color.new(#4cff00, 0) : color.new(#7a8494, 0)
+plot(filt, "濾網線", color=color.new(#ffd400, 0), linewidth=2)
+barcolor(posCol)
+if dirNow != 0
+    strategy.entry(dirNow > 0 ? "多" : "空", dirNow > 0 ? strategy.long : strategy.short)
