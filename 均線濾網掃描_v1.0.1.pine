@@ -1,0 +1,43 @@
+//@version=5
+// 用途：檢驗 G、H、I 三組「日線均線濾網」的天數設定（2026-10-17）
+// 等價於 通用趨勢反手 v1.2.0 在 confirm=1、minHold=0、不對稱倍數關閉時的行為，
+// 但把 if 區塊壓到最少，方便貼進 TradingView 的 Monaco 編輯器（縮排會疊加）。
+// 起始資金必須夠買一口：2026 年一口 NQ 約 58.8 萬美元，10 萬會靜默變成零交易。
+strategy("均線濾網掃描 v1.0.1", overlay=true, initial_capital=20000000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.02, slippage=1, process_orders_on_close=true, pyramiding=0)
+atrLen = input.int(60, "ATR 週期")
+atrMult = input.float(70, "ATR 倍數", step=1)
+warmMult = input.int(6, "暖機倍數")
+useReg = input.bool(true, "啟用日線均線濾網")
+regLen = input.int(60, "均線長度（日）")
+bothSides = input.bool(false, "多空都擋（不勾＝只擋空單）")
+atrV = ta.atr(atrLen)
+hh = ta.highest(high, atrLen)
+ll = ta.lowest(low, atrLen)
+longStop0 = hh - atrMult * atrV
+shortStop0 = ll + atrMult * atrV
+var float longStop = na
+var float shortStop = na
+longStop := close[1] > nz(longStop[1], longStop0) ? math.max(longStop0, nz(longStop[1], longStop0)) : longStop0
+shortStop := close[1] < nz(shortStop[1], shortStop0) ? math.min(shortStop0, nz(shortStop[1], shortStop0)) : shortStop0
+sigLong = close > nz(shortStop[1], close)
+sigShort = close < nz(longStop[1], close)
+var int dir = 0
+newDir = dir == 1 ? (sigShort ? -1 : 1) : dir == -1 ? (sigLong ? 1 : -1) : (sigLong ? 1 : sigShort ? -1 : 0)
+flipped = newDir != dir and newDir != 0
+dir := newDir
+canGo = bar_index >= atrLen * warmMult and barstate.isconfirmed
+regRatio = request.security(syminfo.tickerid, "D", close[1] / ta.sma(close, regLen)[1], lookahead=barmerge.lookahead_on)
+regUp = nz(regRatio, 1) >= 1
+okLong = not useReg or not bothSides or regUp
+okShort = not useReg or not regUp
+regChg = useReg and regUp != regUp[1]
+want = dir == 1 ? (okLong ? 1 : 0) : dir == -1 ? (okShort ? -1 : 0) : 0
+cur = strategy.position_size > 0 ? 1 : strategy.position_size < 0 ? -1 : 0
+doAct = canGo and (flipped or regChg) and want != cur
+if doAct and want == 1
+    strategy.entry("多", strategy.long)
+if doAct and want == -1
+    strategy.entry("空", strategy.short)
+if doAct and want == 0
+    strategy.close_all()
+barcolor(cur > 0 ? color.new(#ff3b3b, 0) : cur < 0 ? color.new(#00c853, 0) : color.new(#7a8494, 60))
