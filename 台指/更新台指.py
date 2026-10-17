@@ -7,8 +7,11 @@
 
 - 檔名日期 D 的逐筆檔＝前一天 15:00 起的夜盤＋D 當天日盤；晚上的夜盤要等隔天的檔才有。
 - 逐筆檔只保留約 30 個交易日，所以合成好的 K 存在 台指/日/YYYYMMDD.json 當正本，之後只補新的日子。
-- 近月＝第三個星期三（最後交易日）還沒過的最小月份；到期日當天仍算舊約。換月時儀表板用總表裡
-  「舊約最後一天收盤時新約的價格」把舊的 K 整段平移（往回調整），避免換月那一刻跳一段造成假訊號。
+- 近月＝第三個星期三（最後交易日）還沒過的最小月份；到期日當天仍算舊約。
+- 換倉（2026-10-17 使用者定）：最後交易日尾盤前五分鐘（13:25，舊約日盤 13:30 收）平掉舊約，同一刻用市價進新約。
+  所以那天的 K 棒 13:25 以前是舊約、以後是新約，資料檔記下 rt（換倉那根 K 的起點）、out（舊約平倉價）、
+  in（新約進倉價）；儀表板用這個價差把換倉以前的 K 整段平移（往回調整）讓趨勢線連續，不會因為近次月價差
+  （10/16 約 170 點）產生假訊號，交易明細則真的記一筆「換倉」、多算一次來回成本。
 - 時段與切法逐行照 技能 index-trend-ops 的 scripts/tx_short.py（日盤 08:45～13:45、夜盤 15:00～05:00，
   交易時段內沒成交補平盤、缺口 2 小時內），所以 10/6～10/15 的結果要跟它一致：A/B +801、B2 +1,346、B3 +2,348。
 只用 Python 內建模組。用法：
@@ -27,6 +30,7 @@ START = date(2026, 9, 24)          # 同 tx_short.py：10/6 起算，前面留�
 TFS = (30, 37, 22)
 UA = {"User-Agent": "Mozilla/5.0"}
 URL = "https://www.taifex.com.tw/file/taifex/Dailydownload/DailydownloadCSV/Daily_{:%Y_%m_%d}.zip"
+ROLL_HM = (13, 25)                 # 換倉時刻：最後交易日尾盤前五分鐘（舊約日盤 13:30 收盤）
 
 def last_trade_day(ym):            # 台指期最後交易日：該月第三個星期三
     y, m = int(ym[:4]), int(ym[4:])
@@ -91,13 +95,26 @@ def build(d, rows):
     # 同一秒內的成交保留檔案原本的先後（只照時間排、穩定排序）；照價格排的話每根 K 的開收盤會差幾點
     T = sorted(((t, p, q) for t, m, p, q in tx if m == c), key=lambda x: x[0])
     if not T: return None
-    # 換月平移用：近月最後一筆成交的那一刻，次月的最新價
+    # 換倉：最後交易日 13:25 平舊約、同一刻市價進新約，所以那天 13:25 之後的 K 改用新約
+    cut = int(datetime(d.year, d.month, d.day, *ROLL_HM, tzinfo=TZ).timestamp() * 1000)
+    N = sorted(((t, p, q) for t, m, p, q in tx if m == nxt[0]), key=lambda x: x[0]) if nxt else []
+    c2 = nxt[0] if N and last_trade_day(c) == d and T[0][0] < cut <= N[-1][0] else None
+    # 換月平移用（萬一換月那天的檔漏掉，儀表板退回用日界的次月價差）：近月最後一筆成交那一刻的次月價
     nx = None
-    if nxt:
-        lt = T[-1][0]; N = sorted(((t, p) for t, m, p, q in tx if m == nxt[0] and t <= lt), key=lambda x: x[0])
-        if N: nx = N[-1][1]
-    out = {"d": f"{d:%Y%m%d}", "c": c, "last": T[-1][1], "lt": T[-1][0], "nx": nx, "n": len(T), "b": {}}
-    for tf in TFS: out["b"][str(tf)] = encode(bars(T, tf), tf)
+    if N and not c2:
+        lt = T[-1][0]; nx = ([p for t, p, q in N if t <= lt] or [None])[-1]
+    LAST = N[-1] if c2 else T[-1]
+    out = {"d": f"{d:%Y%m%d}", "c": c, "c2": c2, "roll": {}, "last": LAST[1], "lt": LAST[0], "nx": nx,
+           "n": len([1 for t, p, q in T if t < cut]) + len([1 for t, p, q in N if t >= cut]) if c2 else len(T), "b": {}}
+    for tf in TFS:
+        if c2:
+            ms = tf * 1000; rt = -(-cut // ms) * ms       # 換倉那根 K：第一個不早於 13:25 的 K 棒起點
+            A = [x for x in T if x[0] < rt]; Bn = [x for x in N if x[0] >= rt]
+            if A and Bn:
+                out["roll"][str(tf)] = {"rt": rt, "out": A[-1][1], "in": Bn[0][1]}
+                out["b"][str(tf)] = encode(bars(A + Bn, tf), tf); continue
+        out["b"][str(tf)] = encode(bars(T, tf), tf)
+    if c2 and not out["roll"]: out["c2"] = c2 = None       # 三個週期都切不出來就整天照舊約
     return out
 
 def main():
@@ -117,8 +134,13 @@ def main():
                 if day:
                     json.dump(day, open(os.path.join(DAY_DIR, k + ".json"), "w", encoding="utf-8", newline="\n"), separators=(",", ":"))
                     fin = d < today or day["lt"] >= int(datetime(d.year, d.month, d.day, 13, 40, tzinfo=TZ).timestamp() * 1000)
-                    idx["days"].append(dict({x: day[x] for x in ("d", "c", "last", "lt", "nx", "n")}, fin=fin)); new += 1
-                    print(k, f"近月 {day['c']}，逐筆 {day['n']:,}，最後 {day['last']}，次月 {day['nx']}" + ("" if fin else "（只有夜盤，日盤收盤後再補）"))
+                    e = dict({x: day[x] for x in ("d", "c", "last", "lt", "nx", "n")}, fin=fin)
+                    if day["c2"]: e["c2"] = day["c2"]; e["roll"] = day["roll"]
+                    idx["days"].append(e); new += 1
+                    r = day["roll"].get(str(TFS[0]))
+                    print(k, f"近月 {day['c']}，逐筆 {day['n']:,}，最後 {day['last']}，次月 {day['nx']}"
+                          + (f"／換倉 {day['c']}→{day['c2']}：{datetime.fromtimestamp(r['rt'] / 1000, TZ):%H:%M:%S} 平 {r['out']} 進 {r['in']}（價差 {r['in'] - r['out']:+}）" if r else "")
+                          + ("" if fin else "（只有夜盤，日盤收盤後再補）"))
                 else: none.add(k); print(k, "檔案裡沒有台指期近月成交")
             elif st == "none":
                 if d < today: none.add(k); print(k, "期交所沒有這天的檔（休市）")

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>指數趨勢儀表板 v1.14.0</title>
+<title>指數趨勢儀表板 v1.15.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -149,7 +149,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.14.0";
+const VERSION = "v1.15.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -995,7 +995,10 @@ function renderInfo(p){
   $("px-" + p.k).innerHTML = fmtP(p, last.c);
   const parts = [];
   // 台指是盤後資料，持有時間算到現在不準；改放「資料到幾點」，手機上才不會被截掉（v1.12.0 有即時 K 時寫「即時到」）
-  const txTo = p.src === "tx" ? `${TX.liveN[p.tfSec] ? "即時到" : "盤後到"} <b>${tText(last.t)}</b>` : "";
+  const txTo = p.src === "tx"
+    ? `${TX.liveN[p.tfSec] ? "即時到" : "盤後到"} <b>${tText(last.t)}</b>` +
+      (TX.hold ? `<span title="換月日 TradingView 的即時 K 可能還是舊合約，差 150 點以上，所以先只看盤後資料">（換月中）</span>` : "")
+    : "";
   if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, p.src === "tx" ? txTo : `<b>${durText(Date.now() - e.t)}</b>`);
   else if(p.src === "tx") parts.push(txTo);
   parts.push(`${trigK} <b>${trig}</b>`);
@@ -1069,6 +1072,7 @@ function tradesOf(T){
       const s = p.bars.findIndex((b, i) => i >= p.R.warm && b.t >= TX_START);
       if(s >= 0) rows.push({k:T.k, t:p.bars[s].t, act:"起算持有", side:p.R.pos[s], p:p.bars[s].c, nq:null, note:""});
     }
+    TX.rollRows = rows.length ? (TX.rolls[p.tfSec] || []).filter(r => r.t > rows[0].t) : [];
   }else rows = LOGROWS.filter(r => r.k === T.k).map(r => Object.assign({}, r));
   // 換算那斯達克點數：照 更新紀錄.py 的 nqconv，用當時那一分鐘（往前找 30 分鐘內）的 Hyperliquid 收盤÷當根價格，
   // 找不到才用現在的比例。用現在的比例會跟正式紀錄差 10 點以上（盈虧點數不受影響，算法是漲跌 %×進場點數）。
@@ -1093,15 +1097,21 @@ function tradesOf(T){
     if(j >= lo && j < n && pos[j] !== cur){ add(s < n ? s : j, pos[j], "校正"); cur = pos[j]; }
     for(let i = s; i < n; i++) if(pos[i] !== cur){ add(i, pos[i], ""); cur = pos[i]; }
   }
+  // 台指換倉（v1.15.0）：13:25 平舊約、同一刻市價進新約——插在那根 K 的部位變動之前
+  if(T.self && TX.rollRows.length){
+    for(const r of TX.rollRows) rows.push({k:T.k, t:r.t, act:"換倉", side:0, p:r.in, nq:null, note:`舊約平倉 ${r.out}`});
+    rows.sort((a, b) => a.t - b.t || (a.act === "換倉" ? -1 : b.act === "換倉" ? 1 : 0));
+  }
   let pts = 0, pct = 0, cnt = 0, win = 0, side = 0, ent = null, entNq = null, entT = null, entLive = false;
   const trades = [];
   for(const r of rows){
     const pn = r.nq != null ? r.nq : r.p;
     if(r.act === "換倉"){   // 舊約平倉價寫在備註
+      if(!side) continue;    // 換倉那一刻空手：沒有倉要換
       const m = /舊約平倉 ([\d.]+)/.exec(r.note), old = m ? +m[1] : r.p, g = (old - ent) * side;
       pts += g; pct += g / ent * 100; cnt++; win += g > 0;
       trades.push({side, et:entT, ep:entNq, xt:r.t, xp:old, g, gp:g / ent * 100, cum:pts, roll:true, live:entLive || !!r.live});
-      ent = r.p; entNq = pn; entT = r.t; entLive = !!r.live; continue;
+      ent = r.p; entNq = T.self ? r.p : pn; entT = r.t; entLive = !!r.live; continue;
     }
     if(side !== 0 && r.side !== side){
       const g = (r.p / ent - 1) * side; pts += g * entNq; pct += g * 100; cnt++; win += g > 0;
@@ -1180,7 +1190,7 @@ function renderTradesNT(T, C){
     <div class="tnote">${C.name === "tx"
       ? `微台 1 口・每點 ${TMF.mult} 元・每邊手續費
       <input id="tmfFee" type="number" step="1" min="0" value="${TMF.fee}" style="width:52px"> 元・期交稅十萬分之二（買賣各一次）<br>
-      未扣滑價・2026/10/06 起回算・期交所每日逐筆檔＋TradingView 即時，資料到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新${TX.roll ? "・換月前的價格已照換月價差平移，盈虧點數不受影響" : ""}`
+      未扣滑價・2026/10/06 起回算・期交所每日逐筆檔＋TradingView 即時，資料到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新${TX.roll ? "・換月日 13:25 平舊約、同一刻市價進新約（多算一次來回成本）；換倉前的價格照換倉價差平移，盈虧點數不受影響" : ""}${TX.hold ? "<br>換月中：TradingView 的即時 K 可能還是舊合約（差 150 點以上），先只用盤後資料，盤後檔補到換倉點就自動恢復" : ""}`
       : `微型那斯達克 1 口・每點 ${MNQ.mult} 美元・單邊手續費
       <input id="mnqFee" type="number" step="0.1" min="0" value="${MNQ.fee}" style="width:52px"> 美元・匯率
       <input id="mnqRate" type="number" step="0.01" min="20" max="50" placeholder="${ratePh}" value="${MNQ.rateAuto ? "" : MNQ.rate}" style="width:64px">
@@ -1578,14 +1588,19 @@ function gtrSave(){
 /* ============ v1.11.0 台指（盤後版） ============
    台指/index.json 是總表（各交易日的近月合約、最後價、當時次月價），台指/日/YYYYMMDD.json 是那天合成好的 30／37／22 秒 K，
    每根 6 個整數：距上一根幾根、開−上一根收、高−開、開−低、收−開、量（更新台指.py 的 encode）。
-   換月：畫面用最後一天的近月；舊約那幾天的 K 整段加上「舊約最後一天收盤時 次月價−舊約價」（往回調整），盈虧點數不變。 */
-const TX = {bars:{}, span:{}, base:{}, baseSpan:{}, ready:false, upd:"", err:"", roll:false,
-            live:[], liveN:{}, liveAt:0}, TX_START = Date.UTC(2026, 9, 5, 16);   // 台北 10/06 00:00
+   換倉（v1.15.0，使用者 2026-10-17 定）：最後交易日（第三個星期三）尾盤前五分鐘 13:25 平掉舊約、同一刻市價進新約，
+   資料檔那天的 roll 記著換倉那根 K 的起點 rt、舊約平倉價 out、新約進倉價 in。畫面把換倉以前的 K 整段加上
+   （in − out）（往回調整）讓趨勢線連續——近次月價差有 150 點以上，不平移的話換月那一刻一定翻向；
+   交易明細則真的拆成兩筆、記「換倉」，多算一次來回成本。萬一換月那天的檔漏掉，退回用日界的次月價差平移。 */
+const TX = {bars:{}, span:{}, base:{}, baseSpan:{}, ready:false, upd:"", err:"", roll:false, rolls:{}, rollRows:[],
+            hold:false, lastC:"", upTo:0, live:[], liveN:{}, liveAt:0}, TX_START = Date.UTC(2026, 9, 5, 16);   // 台北 10/06 00:00
 /* v1.12.0 台指即時：TradingView 台指期 1 秒圖掛「台指即時傳送」腳本，警報每約 15 秒把 1 秒 K 送到轉接站 index-trend-tx
    （worker-tx\，只留 3 天）。這裡每 10 秒拿盤後檔最後一根之後的 1 秒 K，照 更新台指.py 的 bars() 同一套切法合成
    30／37／22 秒 K 接在盤後資料後面：以 1970 起整數秒切桶、只算交易時段、同一段開盤內 2 小時內沒成交補平盤 K。
    1 秒 K 一定整根落在某個桶裡，所以開高低收跟盤後逐筆合成的一致（量也一致）。
-   即時 K 一律當最新合約、不做換月平移；TradingView 的 TXF1! 何時換月跟盤後檔的「第三個星期三」可能差一天，換月那天要看一下。 */
+   即時 K 一律當最新合約、不做換月平移。TXF1! 何時換到新合約不一定跟我們 13:25 換倉同一刻（可能早一天、也可能晚），
+   近次月價差 150 點以上，接錯合約三格會立刻翻向——所以從最後交易日前一天夜盤 15:00 起，到盤後檔補到換倉點之後為止，
+   台指三格只看盤後資料（txHoldLive），第二行會寫「換月中」。 */
 const TX_LIVE = "https://index-trend-tx.eason-237588.workers.dev/tx";
 function txOpen(t){   // 同 更新台指.py 的 tx_open（台北時間）
   const d = new Date(t + 8 * 3600000), wd = (d.getUTCDay() + 6) % 7, hm = d.getUTCHours() * 60 + d.getUTCMinutes();
@@ -1609,9 +1624,20 @@ function txLiveBars(tf, base){
   }
   return seed ? B.slice(1) : B;
 }
+function txRollAt(ym){            // 該月最後交易日＝第三個星期三；回傳換倉時刻與「開始不接即時」的時刻
+  const y = +ym.slice(0, 4), m = +ym.slice(4) - 1, w = new Date(Date.UTC(y, m, 1)).getUTCDay();
+  const day = 1 + (3 - w + 7) % 7 + 14;
+  return {rt: Date.UTC(y, m, day, 5, 25), start: Date.UTC(y, m, day - 1, 7, 0)};   // 台北 13:25／前一天 15:00
+}
+function txHoldLive(){            // 換月窗內（盤後檔還沒補到換倉點）不接即時 K
+  if(!TX.lastC) return false;
+  const r = txRollAt(TX.lastC);
+  return Date.now() >= r.start && TX.upTo < r.rt;
+}
 function txMerge(){
+  TX.hold = txHoldLive();
   for(const tf in TX.base){
-    const L = txLiveBars(+tf, TX.base[tf]);
+    const L = TX.hold ? [] : txLiveBars(+tf, TX.base[tf]);
     TX.bars[tf] = TX.base[tf].concat(L); TX.liveN[tf] = L.length; TX.span[tf] = TX.baseSpan[tf] + L.length;
   }
   PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; });
@@ -1625,11 +1651,11 @@ async function pollTXL(){
   TX.liveAt = d.at * 1000;
   if(TX.ready) txMerge();
 }
-function txDecode(a, tf, adj){
+function txDecode(a, tf, adj, rt, adj2){   // rt＝換倉那根 K 的起點：那根以後改用 adj2
   const B = [], ms = tf * 1000; let t = a.length ? a[0] : 0, pc = 0;
   for(let i = 1; i < a.length; i += 6){
-    t += a[i] * ms; const o = a[i+1] + pc, c = o + a[i+4];
-    B.push({t, o:o + adj, h:o + a[i+2] + adj, l:o - a[i+3] + adj, c:c + adj, v:a[i+5]}); pc = c;
+    t += a[i] * ms; const o = a[i+1] + pc, c = o + a[i+4], j = rt != null && t >= rt ? adj2 : adj;
+    B.push({t, o:o + j, h:o + a[i+2] + j, l:o - a[i+3] + j, c:c + j, v:a[i+5]}); pc = c;
   }
   return B;
 }
@@ -1637,20 +1663,34 @@ async function loadTX(){
   const idx = await jget("台指/index.json?t=" + Date.now());
   if(TX.ready && idx.upd === TX.upd) return;
   const days = idx.days, files = await Promise.all(days.map(x => jget(`台指/日/${x.d}.json?u=${encodeURIComponent(idx.upd)}`)));
-  // 由新往舊累加換月價差
-  const adj = new Array(days.length).fill(0); let roll = false;
-  for(let i = days.length - 2; i >= 0; i--){
-    adj[i] = adj[i+1];
-    if(days[i].c !== days[i+1].c && days[i].nx != null){ adj[i] += days[i].nx - days[i].last; roll = true; }
-  }
+  let roll = false;
   for(const tf of idx.tfs){
-    const B = [];
-    files.forEach((f, i) => { for(const b of txDecode(f.b[tf], tf, adj[i])) B.push(b); });
+    /* 由新往舊累加價差：當天 13:25 的換倉用 in − out；跨日換約（換倉那天的檔漏掉時的退路）用日界的次月價差。
+       pre＝那天換倉以前要加的價差，post＝換倉以後（沒換倉的日子兩者相同）。 */
+    const pre = new Array(days.length).fill(0), post = new Array(days.length).fill(0);
+    let cur = 0;
+    for(let i = days.length - 1; i >= 0; i--){
+      const nd = days[i + 1];
+      if(nd && (days[i].c2 || days[i].c) !== nd.c && days[i].nx != null){ cur += days[i].nx - days[i].last; roll = true; }
+      post[i] = cur;
+      const r = days[i].roll && days[i].roll[tf];
+      if(r){ cur += r.in - r.out; roll = true; }
+      pre[i] = cur;
+    }
+    const B = [], rolls = [];
+    files.forEach((f, i) => {
+      const r = days[i].roll && days[i].roll[tf];
+      for(const b of txDecode(f.b[tf], tf, pre[i], r ? r.rt : null, post[i])) B.push(b);
+      if(r) rolls.push({t:r.rt, out:r.out + pre[i], in:r.in + post[i]});
+    });
+    TX.rolls[tf] = rolls;
     TX.base[tf] = B;
     // 預設顯示最後兩個交易日（含夜盤）
     const t0 = files.length > 1 ? (txDecode(files[files.length-2].b[tf], tf, 0)[0] || {t:0}).t : 0;
     TX.baseSpan[tf] = Math.max(30, B.filter(b => b.t >= t0).length);
   }
+  const LD = days[days.length - 1];
+  TX.lastC = LD ? (LD.c2 || LD.c) : ""; TX.upTo = LD ? LD.lt : 0;
   TX.upd = idx.upd; TX.roll = roll; TX.ready = true; TX.err = "";
   txMerge();
 }
