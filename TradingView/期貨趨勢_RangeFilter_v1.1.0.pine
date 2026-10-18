@@ -26,7 +26,9 @@
 //   佣金：微型那斯達克單邊 2.5 美元／微台每邊 15 元＋期交稅；訂單大小固定 1 口；
 //   不開止損止盈；圖表要一般 K 線，不能是平均 K 線。
 //
-// 寫法說明：縮排只出現在兩個 if 的下一行，各只有一行，這樣貼進 Pine 編輯器時縮排不會一路疊加。
+// 寫法說明：整份只有最後那個 if 底下兩行需要縮排。貼進 Pine 編輯器時 Monaco 會讓每個換行
+// 「繼承上一行的縮排」再加上字串裡的前導空格，所以 strategy.entry 那行寫 4 格（0+4=4）、
+// alert 那行一格都不要寫（繼承 4、加 0 還是 4），整段就能一次貼完、不必再用鍵盤修縮排。
 //@version=6
 strategy("期貨趨勢 RF", overlay=true, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, initial_capital=100000, calc_on_every_tick=false)
 per = input.int(200, "取樣週期", minval=1)
@@ -70,5 +72,4 @@ barcolor(posCol)
 alertMsg = (dirNow > 0 ? "▲ 翻多" : "▼ 翻空") + "\n" + grpName + "\n\n訊號時間　" + str.format_time(time, "MM-dd HH:mm", "Asia/Taipei") + "\n訊號價　　" + str.tostring(close, format.mintick)
 if dirNow != 0
     strategy.entry(dirNow > 0 ? "多" : "空", dirNow > 0 ? strategy.long : strategy.short)
-if dirNow != 0
     alert(alertMsg, alert.freq_once_per_bar_close)
