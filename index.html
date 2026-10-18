@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.16.4</title>
+<title>期貨趨勢 v1.17.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -140,7 +140,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 <div class="app">
 <header>
   <h1>期貨趨勢<small id="ver"></small></h1>
-  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="tx">台指</button><button data-pg="long">中長趨勢</button><button data-pg="obs">觀察</button></div>
+  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="tx">台指</button><button data-pg="long">中長趨勢</button><button data-pg="obs">觀察</button><button data-pg="obs2">觀察二</button></div>
   <button class="hbtn" id="tradeBtn">交易明細</button>
   <div class="status"><i class="dot" id="dot"></i><span id="stTxt">準備中</span></div>
 </header>
@@ -162,7 +162,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.16.4";
+const VERSION = "v1.17.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -542,6 +542,28 @@ const PANELS = [
    spec:{tf:"2 分", par:"ATR 反手 60/70・日線 60 日均線之上不做空", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
    sub:"NQ 期貨單一月份合約 2 分（同 D，延遲約 10 分鐘）・ATR 反手 60/70・日線 60 日均線之上不做空",
    P:{len:60, mult:70, regLen:60}},
+  /* v1.17.0 觀察二（使用者 2026-10-18 要求）：TradingView 版面 848 六組 30 秒 RF 換商品、同一合約內拉長回測
+     （那斯達克 12 月約 9/19～10/17、微台 10 月約 9/17～、恆生 10 月約 9/30～，扣來回 0.02%）18 組裡挑 4 組觀察：
+     那斯達克 555/23 +7.71%（唯一三個商品前後半都賺的參數）、微台 555/23 +6.64%、那斯達克 37/37 +7.76%（回落 1.32% 最平順）、
+     恆生 555/25.5 +6.11%（勝率 65%、回落 0.96%，但只有 2.5 週 17 筆）。參數照 848 不改；那斯達克兩格用 B 格同一份 Gate 30 秒原生 K、
+     微台用台指頁的 30 秒 K。恆生沒有免費 30 秒資料源，先放空格，等使用者決定接法。 */
+  {k:"o2nq", pg:"obs2", title:"那斯達克", tf:"觀察二・555/23", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
+   spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 23・多空反轉", src:"Gate QQQ 合約原生 30 秒 K"},
+   sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 555・倍數 23（848 左中）",
+   P:{per:555, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  {k:"o2tx", pg:"obs2", title:"台指期", tf:"觀察二・555/23", src:"tx", tfSec:30, nq:false, kind:"rf", span:1e9,
+   spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 23・多空反轉", src:"台指期近月含夜盤：期交所盤後逐筆＋TradingView 即時"},
+   sub:"台指期近月（含夜盤）30 秒 K・Range Filter 取樣 555・倍數 23・盤後檔＋TradingView 即時",
+   P:{per:555, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  {k:"o2nq37", pg:"obs2", title:"那斯達克", tf:"觀察二・37/37", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
+   spec:{tf:"30 秒", par:"Range Filter 取樣 37・倍數 37・多空反轉", src:"Gate QQQ 合約原生 30 秒 K"},
+   sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 37・倍數 37（848 右下）",
+   P:{per:37, mult:37, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  {k:"o2hsi", pg:"obs2", title:"恆生", tf:"觀察二・555/25.5", src:"none", nq:false, kind:"rf", span:1e9,
+   waitMsg:"恆生期貨沒有免費的 30 秒資料源，資料接法待決定（策略：30 秒 Range Filter 555/25.5）",
+   spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 25.5・多空反轉", src:"待接"},
+   sub:"小型恆生期貨 30 秒 K・Range Filter 取樣 555・倍數 25.5（848 右中）・資料源待接",
+   P:{per:555, mult:25.5, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
 ];
 for(const p of PANELS){ p.bars = []; p.done = 0; p.R = null; p.view = {span:p.span, off:0}; p.hover = null; p.dirty = false; p.ready = false; }
 const PAN = k => PANELS.find(p => p.k === k);
@@ -848,6 +870,7 @@ async function backfill(){
 /* ============ 計算 ============ */
 function recompute(p){
   let B;
+  if(p.src === "none") return;   // v1.17.0 恆生：資料源待接
   if(p.src === "gate"){
     // Gate 原生 30 秒 K（含無成交的 0 量 K）；只留 CME 時段，與 A-1 同切法
     const raw = RAW1M[p.sym]; if(!raw) return;
@@ -924,7 +947,7 @@ function buildDOM(){
         <button data-k="${p.k}" data-z="reset" title="回到最新">⟲</button>
       </div>
       <div class="tip" id="tip-${p.k}"></div>
-      <div class="wait" id="wait-${p.k}">載入中…</div>
+      <div class="wait" id="wait-${p.k}">${p.waitMsg || "載入中…"}</div>
     </div>
   </section>`).join("");
   $("tradeTabs").innerHTML = TRADE_K.map(T => `<button data-k="${T.k}"${T.blink?" data-blink":""}>${T.name}</button>`).join("");
@@ -1051,6 +1074,7 @@ const TRADE_K = [
   {k:"TX1", pk:"tx30", blink:true, name:"台指 A/B", unit:"點", self:true},
   {k:"TX2", pk:"tx37", name:"台指 B2", unit:"點", self:true},
   {k:"TX3", pk:"tx22", name:"台指 B3", unit:"點", self:true},
+  {k:"TX4", pk:"o2tx", name:"觀察二 台指", unit:"點", self:true},   // v1.17.0 觀察二的微台 30 秒 555/23
   {k:"R30", pk:"atr30", name:"G",    unit:"點"},   // v1.9.0 觀察頁，紀錄 2026-10-14 起算
   {k:"R1",  pk:"atr1",  name:"H",    unit:"點"},
   {k:"R2",  pk:"atr2",  name:"I",    unit:"點"},
@@ -1764,7 +1788,7 @@ async function main(){
       loadGTR().catch(e => { for(const k of ["gate2", "gate3"]) $("wait-" + k).textContent = "Gate 逐筆合成失敗：" + e.message + "，請重新整理"; setLoad("gtr", null); }),
       // C 格 v1.10.0 刪除；Hyperliquid 仍要抓：H 格與交易明細的那斯達克換算要用
       loadHL(PAN("atr1")).catch(e => { $("wait-atr1").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
-      loadTX().catch(e => { TX.err = "台指資料載入失敗：" + e.message + "，請重新整理"; for(const k of ["tx30", "tx37", "tx22"]) $("wait-" + k).textContent = TX.err; }),
+      loadTX().catch(e => { TX.err = "台指資料載入失敗：" + e.message + "，請重新整理"; for(const k of ["tx30", "tx37", "tx22", "o2tx"]) $("wait-" + k).textContent = TX.err; }),
       pollTXL().catch(() => {}),   // 即時 K 拿不到時照舊只顯示盤後資料
       loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
