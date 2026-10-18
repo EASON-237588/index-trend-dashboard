@@ -1,6 +1,18 @@
 // 期貨趨勢・短趨勢 Range Filter（照儀表板 index.html 的 calcRF 逐行移植）
 // 2026-10-17 建立；v1.0.1 濾網線改照持倉上色（多紅、空綠、空手灰），與儀表板一致。
+// v1.1.0（2026-10-18）加發警報：翻轉時呼叫 alert()，訊息直接就是要發出去的 LINE 內容。
 // 用途：把 B、B2、B3 與台指 A/B、B2、B3 六組搬上 TradingView 版面 848。
+//
+// ★ 警報怎麼用（只有台指 A/B 那格要設，2026-10-18 使用者指定）
+//   為什麼台指走這條路：那格跟儀表板吻合度 98.2%、平均只差 1.1 分鐘，是六格裡最準的；
+//   而且一次省掉三個坑——換倉（連續月自己換約，不必處理近次月約 170 點價差）、
+//   資料拼接（期交所盤後逐筆檔＋即時 K）、台指日夜盤與休息時段判斷。
+//   LINE 要在標頭帶權杖，TradingView 警報只能打一個網址、不能自訂標頭，所以警報打到
+//   推播程式的 /tvalert?k=TV_KEY（gold-rf-line，在 黃金分析儀表板\push-worker），由它代發 LINE。
+//   建警報時：條件選「任何 alert() 函式呼叫」、到期選「開啟中」、通知只勾「Webhook URL」，
+//   網址由使用者自己貼（含密鑰，不經過對話）。
+//   B2 不要設警報：它在 TradingView 上吻合度只有 75.7%，還會多出 10/14 那種一分鐘假翻轉，
+//   B2 的推播改由推播程式自己用 Gate 逐筆算（37 秒 450/23）。
 //
 // TradingView 的秒數圖只有 1／5／10／15／30／45 秒（自訂間隔沒有「秒」這個類型，實測過），
 // 所以改成「同樣時間長度、換算取樣週期」，六格都用 30 秒：
@@ -8,13 +20,13 @@
 //   B2／台指 B2   37 秒 × 450 ＝ 16,650 秒  → 取樣 555、倍數 23
 //   B3／台指 B3   22 秒 × 50  ＝ 1,100 秒   → 取樣 37、倍數 45
 // 取樣週期換算是精確的；倍數不是——濾網帶寬＝倍數 ×「每根 K 的平均跳動」，K 棒大小變了跳動就變。
-// B3 由 22 秒變 30 秒，帶寬會寬約一成五，要用筆數跟儀表板對照後再微調倍數。
+// 2026-10-18 逐格對齊儀表板後實際在用的倍數見 skill index-trend-ops（台指 A/B 是 200/24）。
 //
 // 屬性要自己設（skill tradingview-strategy-lab 第一節）：
 //   佣金：微型那斯達克單邊 2.5 美元／微台每邊 15 元＋期交稅；訂單大小固定 1 口；
 //   不開止損止盈；圖表要一般 K 線，不能是平均 K 線。
 //
-// 寫法說明：整份只有最後一行需要縮排，這樣貼進 Pine 編輯器時縮排不會一路疊加。
+// 寫法說明：縮排只出現在兩個 if 的下一行，各只有一行，這樣貼進 Pine 編輯器時縮排不會一路疊加。
 //@version=6
 strategy("期貨趨勢 RF", overlay=true, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, initial_capital=100000, calc_on_every_tick=false)
 per = input.int(200, "取樣週期", minval=1)
@@ -25,6 +37,7 @@ atrMult = input.float(1.5, "ATR 倍數", step=0.1)
 useVol = input.bool(true, "成交量過濾")
 volLen = input.int(20, "成交量平均長度")
 warmX = input.int(6, "暖機倍數（暖機根數＝取樣 × 這個數）", minval=0)
+grpName = input.string("台指期 A/B（微台 30 秒 RF 200/24）", "組別名稱（會出現在警報訊息第二行）")
 src = hl2
 diff = math.abs(src - src[1])
 avrng = ta.ema(diff, per)
@@ -53,5 +66,9 @@ dirNow = go and longSig and pci == -1 ? 1 : go and shortSig and pci == 1 ? -1 : 
 posCol = strategy.position_size > 0 ? color.new(#ff3b3b, 0) : strategy.position_size < 0 ? color.new(#4cff00, 0) : color.new(#7a8494, 0)
 plot(filt, "濾網線", color=posCol, linewidth=2)
 barcolor(posCol)
+// 警報訊息就是要發出去的 LINE 內容原文；推播程式只在後面加上儀表板網址。
+alertMsg = (dirNow > 0 ? "▲ 翻多" : "▼ 翻空") + "\n" + grpName + "\n\n訊號時間　" + str.format_time(time, "MM-dd HH:mm", "Asia/Taipei") + "\n訊號價　　" + str.tostring(close, format.mintick)
 if dirNow != 0
     strategy.entry(dirNow > 0 ? "多" : "空", dirNow > 0 ? strategy.long : strategy.short)
+if dirNow != 0
+    alert(alertMsg, alert.freq_once_per_bar_close)
