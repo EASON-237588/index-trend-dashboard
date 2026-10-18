@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.19.0</title>
+<title>期貨趨勢 v1.19.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -165,7 +165,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.19.0";
+const VERSION = "v1.19.1";   // v1.19.1：觀察二四格名稱與交易明細四組閃爍（使用者 2026-10-18 要求）
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -550,21 +550,21 @@ const PANELS = [
      那斯達克 555/23 +7.71%（唯一三個商品前後半都賺的參數）、微台 555/23 +6.64%、那斯達克 37/37 +7.76%（回落 1.32% 最平順）、
      恆生 555/25.5 +6.11%（勝率 65%、回落 0.96%，但只有 2.5 週 17 筆）。參數照 848 不改；那斯達克兩格用 B 格同一份 Gate 30 秒原生 K、
      微台用台指頁的 30 秒 K。恆生沒有免費 30 秒資料源，先放空格，等使用者決定接法。 */
-  {k:"o2nq", pg:"obs2", title:"那斯達克", tf:"觀察二・555/23", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
+  {k:"o2nq", blink:true, pg:"obs2", title:"那斯達克", tf:"觀察二・555/23", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 23・多空反轉", src:"Gate QQQ 合約原生 30 秒 K"},
    sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 555・倍數 23（848 左中）",
    P:{per:555, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
-  {k:"o2tx", pg:"obs2", title:"台指期", tf:"觀察二・555/23", src:"tx", tfSec:30, nq:false, kind:"rf", span:1e9,
+  {k:"o2tx", blink:true, pg:"obs2", title:"台指期", tf:"觀察二・555/23", src:"tx", tfSec:30, nq:false, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 23・多空反轉", src:"台指期近月含夜盤：期交所盤後逐筆＋TradingView 即時"},
    sub:"台指期近月（含夜盤）30 秒 K・Range Filter 取樣 555・倍數 23・盤後檔＋TradingView 即時",
    P:{per:555, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
-  {k:"o2nq37", pg:"obs2", title:"那斯達克", tf:"觀察二・37/37", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
+  {k:"o2nq37", blink:true, pg:"obs2", title:"那斯達克", tf:"觀察二・37/37", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 37・倍數 37・多空反轉", src:"Gate QQQ 合約原生 30 秒 K"},
    sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 37・倍數 37（848 右下）",
    P:{per:37, mult:37, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.19.0：恆生沒有免費盤後逐筆（港交所逐筆是付費商品），改由 TradingView 小型恆生 30 秒圖掛「恆生傳送」腳本，
      警報每根 30 秒 K 收盤送到轉接站 /hsi（留 10 天），剛建警報時順便補 3,400 根舊 K 給暖機。帳號是港股延遲報價，晚約 15 分鐘。 */
-  {k:"o2hsi", pg:"obs2", title:"恆生", tf:"觀察二・555/25.5", src:"hsi", nq:false, kind:"rf", span:1e9,
+  {k:"o2hsi", blink:true, pg:"obs2", title:"恆生", tf:"觀察二・555/25.5", src:"hsi", nq:false, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 25.5・多空反轉", src:"小型恆生期貨：TradingView 警報（延遲約 15 分鐘）"},
    sub:"小型恆生期貨 30 秒 K・Range Filter 取樣 555・倍數 25.5（848 右中）・TradingView 警報轉送",
    P:{per:555, mult:25.5, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
@@ -1095,10 +1095,10 @@ const TRADE_K = [
   {k:"TX1", pk:"tx30", blink:true, name:"台指 A/B", unit:"點", self:true},
   {k:"TX2", pk:"tx37", name:"台指 B2", unit:"點", self:true},
   {k:"TX3", pk:"tx22", name:"台指 B3", unit:"點", self:true},
-  {k:"TX4", pk:"o2tx", name:"觀察二 台指", unit:"點", self:true},   // v1.17.0 觀察二的微台 30 秒 555/23
-  {k:"O1", pk:"o2nq", name:"觀察二 那斯達克 555/23", unit:"點"},     // v1.19.0 紀錄程式 O1，10/6 起回算
-  {k:"O2", pk:"o2nq37", name:"觀察二 那斯達克 37/37", unit:"點"},    // v1.19.0 紀錄程式 O2
-  {k:"HSI", pk:"o2hsi", name:"觀察二 恆生", unit:"點", self:"hsi"},  // v1.19.0 網頁自算（TradingView 警報資料暖機完成起）
+  {k:"TX4", pk:"o2tx", blink:true, name:"觀察二 台指", unit:"點", self:true},   // v1.17.0 觀察二的微台 30 秒 555/23
+  {k:"O1", pk:"o2nq", blink:true, name:"觀察二 那斯達克 555/23", unit:"點"},     // v1.19.0 紀錄程式 O1，10/6 起回算
+  {k:"O2", pk:"o2nq37", blink:true, name:"觀察二 那斯達克 37/37", unit:"點"},    // v1.19.0 紀錄程式 O2
+  {k:"HSI", pk:"o2hsi", blink:true, name:"觀察二 恆生", unit:"點", self:"hsi"},  // v1.19.0 網頁自算（TradingView 警報資料暖機完成起）
   {k:"R30", pk:"atr30", name:"G",    unit:"點"},   // v1.9.0 觀察頁，紀錄 2026-10-14 起算
   {k:"R1",  pk:"atr1",  name:"H",    unit:"點"},
   {k:"R2",  pk:"atr2",  name:"I",    unit:"點"},
