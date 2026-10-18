@@ -1,0 +1,92 @@
+// 期貨趨勢・中長趨勢 Donchian（照儀表板 index.html 的 calcDon / calcDonG / toFlatShort 逐行移植）
+// 2026-10-18 建立。用途：把 D、D2、E、F 四組換成台指期（TAIFEX:TXF1!，含夜盤）模擬回測，7/15 起算。
+//
+// 四組的設定（組別選好之後，圖表週期一定要自己切對，腳本不會幫你擋）：
+//   D   6 分　Donchian 回看 350 小時（3,500 根）・停損 8 ATR・空手改放空
+//   D2  6 分　Donchian 回看 200 小時（2,000 根）・停損 6 ATR・空手改放空
+//   E   8 分　Donchian 回看 350 小時（2,625 根）・多空反轉、永遠在場、不停損
+//   F   11 分 Donchian 回看 350 小時（1,909 根）・停損 8 ATR・空手改放空
+//                                 ＋停損後要先跌破出場線才准再進（黃金那套 calcDonG）
+//
+// 兩套算法的差別（儀表板裡就是分開寫的，不共用）：
+//   一般版 calcDon：停損後方向歸零，下一次突破就立刻重進。
+//   黃金版 calcDonG：停損後把那個方向封鎖起來，要等方向先離開多方才解除。
+//
+// 回看根數＝回看小時 × 60 ÷ 圖表週期（分鐘），通道與出場線都不含當根（＝ta.highest(...)[1]）。
+// 出場線根數＝回看根數 ÷ 3。
+//
+// 屬性要自己設（skill tradingview-strategy-lab 第一節）：訂單大小固定 1 口、不開止損止盈、
+// 圖表要一般 K 線不能是平均 K 線。本檔已內建台指期大台的成本：每邊 0.003%
+// （約等於手續費 50 元＋期交稅十萬分之二，指數 27,000 時每邊約 162 元）。
+// 起始資金設兩千萬，否則大台一口下不了單、回測會變零交易。
+// 起算日不能寫成 input.time(timestamp(...))：TradingView 要求 input 的預設值是 const int，
+// 而帶時區的 timestamp() 回傳的是 simple int，會編譯失敗（CE10123）。改成年月日三個數字輸入再自己組。
+//@version=6
+strategy("期貨趨勢 Donchian", overlay=true, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, initial_capital=20000000, commission_type=strategy.commission.percent, commission_value=0.003, calc_on_every_tick=false)
+grp = input.string("D", "組別", options=["D", "D2", "E", "F"])
+sy = input.int(2026, "起算年")
+sm = input.int(7, "起算月")
+sd = input.int(15, "起算日")
+startT = timestamp("Asia/Taipei", sy, sm, sd, 0, 0)
+atrLen = input.int(14, "ATR 長度")
+lookH = grp == "D2" ? 200.0 : 350.0
+stopAtr = grp == "D2" ? 6.0 : 8.0
+rev = grp == "E"
+allowLong = true
+allowShort = grp == "E"
+flatShort = grp != "E"
+goldExact = grp == "F"
+tfMin = timeframe.in_seconds() / 60.0
+raw = math.round(lookH * 60 / tfMin)
+look = goldExact ? math.max(20, raw) : math.min(4999, math.max(2, raw))
+exitN = math.max(10, math.round(look / 3))
+hh = ta.highest(high, look)[1]
+ll = ta.lowest(low, look)[1]
+he = ta.highest(high, exitN)[1]
+le = ta.lowest(low, exitN)[1]
+atrV = ta.atr(atrLen)
+c = close
+// ---- 一般版 calcDon（D、D2、E）----
+var int dirA = 0
+var int sideA = 0
+var float avgA = na
+dirA := (not na(hh) and c > hh and allowLong) ? 1 : (not na(ll) and c < ll and allowShort) ? -1 : (not rev and dirA == 1 and not na(le) and c < le) ? 0 : (not rev and dirA == -1 and not na(he) and c > he) ? 0 : dirA
+flipA = dirA != 0 and dirA != sideA
+stopA = not rev and sideA != 0 and not na(atrV) and atrV > 0 and (avgA - c) * sideA >= stopAtr * atrV
+sideA := stopA ? 0 : sideA
+avgA := stopA ? na : avgA
+dirA := stopA ? 0 : dirA
+outA = not rev and dirA == 0 and sideA != 0
+sideA := outA ? 0 : sideA
+avgA := outA ? na : avgA
+sideA := flipA ? dirA : sideA
+avgA := flipA ? c : avgA
+// ---- 黃金版 calcDonG（F）----
+var int dirG = 0
+var int sideG = 0
+var float avgG = na
+var int blk = 0
+dirG := bar_index >= look ? (c > hh ? 1 : c < ll ? -1 : (dirG == 1 and c < le) ? 0 : (dirG == -1 and c > he) ? 0 : dirG) : dirG
+okG = not na(atrV) and atrV > 0
+blk := (okG and blk != 0 and dirG != blk) ? 0 : blk
+stopG = okG and sideG != 0 and (avgG - c) * sideG >= stopAtr * atrV
+blk := stopG ? sideG : blk
+sideG := stopG ? 0 : sideG
+avgG := stopG ? na : avgG
+outG = okG and sideG != 0 and dirG != sideG
+sideG := outG ? 0 : sideG
+avgG := outG ? na : avgG
+inG = okG and sideG == 0 and dirG > 0 and dirG != blk
+sideG := inG ? 1 : sideG
+avgG := inG ? c : avgG
+// ---- 收口：空手改放空、暖機、起算日 ----
+side = goldExact ? sideG : sideA
+pos = flatShort ? (side > 0 ? 1 : -1) : side
+warm = goldExact ? look + atrLen : look
+want = (bar_index >= warm and time >= startT) ? pos : 0
+posCol = strategy.position_size > 0 ? color.new(#ff3b3b, 0) : strategy.position_size < 0 ? color.new(#4cff00, 0) : color.new(#7a8494, 0)
+plot(hh, "通道上緣", color=color.new(#7a8494, 40))
+plot(ll, "通道下緣", color=color.new(#7a8494, 40))
+barcolor(posCol)
+if want != 0
+    strategy.entry(want > 0 ? "多" : "空", want > 0 ? strategy.long : strategy.short)
