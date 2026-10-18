@@ -1,0 +1,23 @@
+//@version=6
+// 期貨趨勢・恆生傳送（2026-10-18）
+// 掛在小型恆生期貨（HKEX:MHI1!）30 秒圖。每根 30 秒 K 收盤送一則警報到轉接站：
+// 最新 3 根（漏送一次下一則會補）＋一段補歷史（每次 25 根，從 3,400 根前往現在補，約 70 分鐘補完，夠策略取樣 555×6 的暖機）。
+// 轉接站以 K 棒時間覆蓋，重複送不會重複算。
+// 警報設定：條件選這支腳本的「任何 alert() 函式呼叫」，通知只勾「網址」，
+// 網址填 https://index-trend-tx.eason-237588.workers.dev/hsi/push?k=密碼（密碼同台指那一組，在 worker-tx\.dev.vars）。
+// 一分鐘兩次，在 TradingView 對太頻繁觸發的警報自動停用的門檻內。帳號的港股是延遲報價，資料會晚約 15 分鐘。
+// 刻意少用縮排：用程式塞進 TradingView 編輯器時，縮排會一行一行疊加亂掉。
+indicator("恆生傳送", overlay = true, max_bars_back = 4000)
+var int back = 3400
+ok = barstate.isrealtime and barstate.isconfirmed
+string s = ""
+for k = 0 to 2
+    s := s + (k == 0 ? "" : ",") + "[" + str.tostring(math.floor(time[k] / 1000)) + "," + str.tostring(open[k]) + "," + str.tostring(high[k]) + "," + str.tostring(low[k]) + "," + str.tostring(close[k]) + "," + str.tostring(nz(volume[k])) + "]"
+hi = math.min(back, bar_index)
+lo = math.max(back - 24, 3)
+if ok and hi >= lo
+    for k = hi to lo
+        s := s + ",[" + str.tostring(math.floor(time[k] / 1000)) + "," + str.tostring(open[k]) + "," + str.tostring(high[k]) + "," + str.tostring(low[k]) + "," + str.tostring(close[k]) + "," + str.tostring(nz(volume[k])) + "]"
+if ok
+    back := hi >= lo ? lo - 1 : 0
+    alert("{\"s\":\"" + syminfo.ticker + "\",\"b\":[" + s + "]}", alert.freq_all)

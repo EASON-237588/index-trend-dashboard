@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.18.0</title>
+<title>期貨趨勢 v1.19.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -165,7 +165,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.18.0";
+const VERSION = "v1.19.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -562,10 +562,11 @@ const PANELS = [
    spec:{tf:"30 秒", par:"Range Filter 取樣 37・倍數 37・多空反轉", src:"Gate QQQ 合約原生 30 秒 K"},
    sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 37・倍數 37（848 右下）",
    P:{per:37, mult:37, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
-  {k:"o2hsi", pg:"obs2", title:"恆生", tf:"觀察二・555/25.5", src:"none", nq:false, kind:"rf", span:1e9,
-   waitMsg:"恆生期貨沒有免費的 30 秒資料源，資料接法待決定（策略：30 秒 Range Filter 555/25.5）",
-   spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 25.5・多空反轉", src:"待接"},
-   sub:"小型恆生期貨 30 秒 K・Range Filter 取樣 555・倍數 25.5（848 右中）・資料源待接",
+  /* v1.19.0：恆生沒有免費盤後逐筆（港交所逐筆是付費商品），改由 TradingView 小型恆生 30 秒圖掛「恆生傳送」腳本，
+     警報每根 30 秒 K 收盤送到轉接站 /hsi（留 10 天），剛建警報時順便補 3,400 根舊 K 給暖機。帳號是港股延遲報價，晚約 15 分鐘。 */
+  {k:"o2hsi", pg:"obs2", title:"恆生", tf:"觀察二・555/25.5", src:"hsi", nq:false, kind:"rf", span:1e9,
+   spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 25.5・多空反轉", src:"小型恆生期貨：TradingView 警報（延遲約 15 分鐘）"},
+   sub:"小型恆生期貨 30 秒 K・Range Filter 取樣 555・倍數 25.5（848 右中）・TradingView 警報轉送",
    P:{per:555, mult:25.5, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
 ];
 for(const p of PANELS){ p.bars = []; p.done = 0; p.R = null; p.view = {span:p.span, off:0}; p.hover = null; p.dirty = false; p.ready = false; }
@@ -873,8 +874,18 @@ async function backfill(){
 /* ============ 計算 ============ */
 function recompute(p){
   let B;
-  if(p.src === "none") return;   // v1.17.0 恆生：資料源待接
-  if(p.src === "gate"){
+  if(p.src === "hsi"){
+    // v1.19.0 恆生：TradingView「恆生傳送」警報送來的 30 秒 K（每根都是收盤後才送，全部算收完）
+    B = HSI.bars; const need = p.P.per * 6 + 10, w = $("wait-" + p.k);
+    if(B.length < need){
+      w.hidden = false;
+      w.textContent = B.length ? `恆生資料累積中：已收到 ${B.length} 根 30 秒 K（到 ${tText(B[B.length-1].t)}），暖機要約 ${need} 根；警報剛建好時每分鐘補約 50 根舊 K`
+                               : (HSI.err || "還沒收到恆生資料：要在 TradingView 小型恆生期貨 30 秒圖掛「恆生傳送」並建警報");
+      p.ready = false; return;
+    }
+    p.done = B.length;
+    if(!p.userZoom) p.view.span = p.span = Math.min(B.length, 1500);
+  }else if(p.src === "gate"){
     // Gate 原生 30 秒 K（含無成交的 0 量 K）；只留 CME 時段，與 A-1 同切法
     const raw = RAW1M[p.sym]; if(!raw) return;
     B = raw.filter(b => cmeOpen(b.t));
@@ -1051,13 +1062,14 @@ function renderInfo(p){
   const txTo = p.src === "tx"
     ? `${TX.liveN[p.tfSec] ? "即時到" : "盤後到"} <b>${tText(last.t)}</b>` +
       (TX.hold ? `<span title="換月日 TradingView 的即時 K 可能還是舊合約，差 150 點以上，所以先只看盤後資料">（換月中）</span>` : "")
-    : "";
-  if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, p.src === "tx" ? txTo : `<b>${durText(Date.now() - e.t)}</b>`);
-  else if(p.src === "tx") parts.push(txTo);
+    : p.src === "hsi" ? `資料到 <b>${tText(last.t)}</b>（延遲約 15 分）` : "";
+  const toLine = p.src === "tx" || p.src === "hsi";
+  if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, toLine ? txTo : `<b>${durText(Date.now() - e.t)}</b>`);
+  else if(toLine) parts.push(txTo);
   parts.push(`${trigK} <b>${trig}</b>`);
   let fw = "";   // v1.18.0 即時資料中斷／漏資料警告
-  if(p.src === "tx"){
-    const f = txFeed(), g = txGaps();
+  if(p.src === "tx" || p.src === "hsi"){
+    const f = p.src === "tx" ? txFeed() : hsiFeed(), g = p.src === "tx" ? txGaps() : hsiGaps();
     if(f) fw = `<span class="feedw" title="${f.long}">${f.short}</span>`;
     if(g.n) fw += `<span class="feedg" title="盤後檔還沒補到的時段裡，即時 1 秒 K 有 ${g.n} 段缺超過 1 分鐘（共約 ${g.min} 分鐘）；盤後檔補上後就會被正本補齊">漏 ${g.n} 段</span>`;
   }
@@ -1084,6 +1096,9 @@ const TRADE_K = [
   {k:"TX2", pk:"tx37", name:"台指 B2", unit:"點", self:true},
   {k:"TX3", pk:"tx22", name:"台指 B3", unit:"點", self:true},
   {k:"TX4", pk:"o2tx", name:"觀察二 台指", unit:"點", self:true},   // v1.17.0 觀察二的微台 30 秒 555/23
+  {k:"O1", pk:"o2nq", name:"觀察二 那斯達克 555/23", unit:"點"},     // v1.19.0 紀錄程式 O1，10/6 起回算
+  {k:"O2", pk:"o2nq37", name:"觀察二 那斯達克 37/37", unit:"點"},    // v1.19.0 紀錄程式 O2
+  {k:"HSI", pk:"o2hsi", name:"觀察二 恆生", unit:"點", self:"hsi"},  // v1.19.0 網頁自算（TradingView 警報資料暖機完成起）
   {k:"R30", pk:"atr30", name:"G",    unit:"點"},   // v1.9.0 觀察頁，紀錄 2026-10-14 起算
   {k:"R1",  pk:"atr1",  name:"H",    unit:"點"},
   {k:"R2",  pk:"atr2",  name:"I",    unit:"點"},
@@ -1129,10 +1144,11 @@ function tradesOf(T){
     // 台指：起算那根（10/6 第一根、且已過暖機）的部位當「起算持有」，之後逐根照格子的部位接著算
     rows = [];
     if(p.ready && p.R && p.done){
-      const s = p.bars.findIndex((b, i) => i >= p.R.warm && b.t >= TX_START);
+      // v1.19.0 恆生（self:"hsi"）沒有固定起算日：從資料暖機完成那根開始
+      const st = T.self === "hsi" ? 0 : TX_START, s = p.bars.findIndex((b, i) => i >= p.R.warm && b.t >= st);
       if(s >= 0) rows.push({k:T.k, t:p.bars[s].t, act:"起算持有", side:p.R.pos[s], p:p.bars[s].c, nq:null, note:""});
     }
-    TX.rollRows = rows.length ? (TX.rolls[p.tfSec] || []).filter(r => r.t > rows[0].t) : [];
+    TX.rollRows = rows.length && T.self !== "hsi" ? (TX.rolls[p.tfSec] || []).filter(r => r.t > rows[0].t) : [];
   }else rows = LOGROWS.filter(r => r.k === T.k).map(r => Object.assign({}, r));
   // 換算那斯達克點數：照 更新紀錄.py 的 nqconv，用當時那一分鐘（往前找 30 分鐘內）的 Hyperliquid 收盤÷當根價格，
   // 找不到才用現在的比例。用現在的比例會跟正式紀錄差 10 點以上（盈虧點數不受影響，算法是漲跌 %×進場點數）。
@@ -1220,7 +1236,7 @@ const txTax = p => Math.round(p * TMF.mult * 0.00002);
 // 每組的成本規則：nt(點數, 進場價, 出場價) → 一趟扣完成本的台幣；fee(進場價, 出場價) → 這一趟的成本
 function costOf(T){
   if(isNQT(T)) return {name:"nq", nt:(g, ep, xp) => (g * MNQ.mult - 2 * MNQ.fee) * MNQ.rate, fee:() => 2 * MNQ.fee * MNQ.rate};
-  if(T && T.self) return {name:"tx", nt:(g, ep, xp) => g * TMF.mult - 2 * TMF.fee - txTax(ep) - txTax(xp), fee:(ep, xp) => 2 * TMF.fee + txTax(ep) + txTax(xp)};
+  if(T && T.self === true) return {name:"tx", nt:(g, ep, xp) => g * TMF.mult - 2 * TMF.fee - txTax(ep) - txTax(xp), fee:(ep, xp) => 2 * TMF.fee + txTax(ep) + txTax(xp)};
   return null;
 }
 const ntFmt = v => sgn(v);   // 使用者 10/16 要求金額不加「元」字
@@ -1279,7 +1295,8 @@ function renderTrades(){
   if($("tradeSheet").hidden) return;
   const T = TRADE_K.find(x => x.k === tradeK) || TRADE_K[0], d = T.d || 0, u = T.unit;
   let html;
-  if(T.self && !TX.ready) html = `<div class="tnote">${TX.err || "台指資料載入中…"}</div>`;
+  if(T.self === true && !TX.ready) html = `<div class="tnote">${TX.err || "台指資料載入中…"}</div>`;
+  else if(T.self === "hsi" && !PAN(T.pk).ready) html = `<div class="tnote">${HSI.err || (HSI.bars.length ? `恆生資料累積中（已收到 ${HSI.bars.length} 根，暖機要約 3,340 根），收齊後就會開始算` : "還沒收到恆生資料：要在 TradingView 小型恆生期貨 30 秒圖掛「恆生傳送」並建警報")}</div>`;
   else if(!T.self && !LOGROWS) html = `<div class="tnote">${logErr || "讀取進出紀錄中…"}</div>`;
   else if(!T.self && !LOGROWS.some(r => r.k === T.k)) html = `<div class="tnote">這組還沒有正式紀錄（開工跑一次紀錄後才有）</div>`;
   else if(costOf(T)) html = renderTradesNT(T, costOf(T));
@@ -1292,7 +1309,7 @@ function renderTrades(){
       <div class="tot ${ud(tot)}">合計 ${sgn(tot)} ${u}（${sgn(totP, 2)}%）${o && o.pts == null ? '<small style="font-size:11px;font-weight:400;color:var(--mute)">　不含浮動</small>' : ""}</div>
       <div>已平倉 ${R.cnt} 筆（賺 ${R.win}／賠 ${R.cnt - R.win}），已實現 <span class="${ud(R.pts)}">${sgn(R.pts)} ${u}（${sgn(R.pct, 2)}%）</span></div>${winLine(T, R)}
       <div>${hold}</div></div>
-      <div class="tnote">${T.self ? `未扣手續費・2026/10/06 起回算・期交所每日逐筆檔（每天 7:00 補夜盤、17:00 補日盤）＋TradingView 即時，資料到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新${TX.roll ? "・換月前的價格已照換月價差平移，盈虧點數不受影響" : ""}</div>` : `未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>`}` +
+      <div class="tnote">${T.self === "hsi" ? `未扣手續費與滑價・點數是恆生指數點・從資料暖機完成那根起算（TradingView 警報開始送資料後約 70 分鐘補齊暖機）・資料延遲約 15 分鐘，到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新</div>` : T.self ? `未扣手續費・2026/10/06 起回算・期交所每日逐筆檔（每天 7:00 補夜盤、17:00 補日盤）＋TradingView 即時，資料到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新${TX.roll ? "・換月前的價格已照換月價差平移，盈虧點數不受影響" : ""}</div>` : `未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>`}` +
       (R.gap ? `<div class="tnote warn">正式紀錄最後一筆之後隔太久，網頁只能從 ${tText(R.first.t)} 接著算，中間可能漏掉交易；開工跑一次紀錄就會補齊。</div>` : "");
     const rowsH = R.trades.map((x, i) => ({x, i: i + 1})).reverse().map(({x, i}) => `<tr class="${x.live ? "live" : ""}">
       <td>${x.live ? "◆" : ""}${i}</td><td class="${sideCls(x.side)}">${SIDE_T[x.side]}</td>
@@ -1751,6 +1768,50 @@ function txGaps(){
   }
   return {n, min:Math.round(sec / 60)};
 }
+/* v1.19.0 恆生：讀轉接站 /hsi 的 30 秒 K。補歷史期間（不到 4,000 根）送來的是比較舊的 K，
+   只抓最後一根之後會漏掉，所以那段每次整包重抓；補齊後才改成只抓最後兩分鐘起。
+   監控同台指，但資料本來就晚約 15 分鐘：用「現在減 15 分」判斷是否在港期交易時段，沒新 K 超過 5 分鐘才警告。
+   港股假日沒有排除，假日會誤報「中斷」。 */
+const HSI_LIVE = TX_LIVE.replace(/\/tx$/, "/hsi"), HSI_DELAY = 15 * 60000;
+const HSI = {bars:[], pollOk:Date.now(), pollErr:"", err:""};
+function hsiOpen(t){              // 港期（台北時間同港時）：日盤 9:15–12:00、13:00–16:30，夜盤 17:15–翌日 3:00
+  const d = new Date(t + 8 * 3600000), wd = (d.getUTCDay() + 6) % 7, hm = d.getUTCHours() * 60 + d.getUTCMinutes();
+  if(hm < 180) return wd >= 1 && wd <= 5;
+  if((hm >= 555 && hm < 720) || (hm >= 780 && hm < 990) || hm >= 1035) return wd < 5;
+  return false;
+}
+async function pollHSI(){
+  const since = HSI.bars.length >= 4000 ? HSI.bars[HSI.bars.length-1].t / 1000 - 120 : 0;
+  const d = await jget(`${HSI_LIVE}?since=${since}`);
+  const m = since ? new Map(HSI.bars.map(b => [b.t, b])) : new Map();
+  for(const [t, o, h, l, c, v] of d.bars) m.set(t * 1000, {t:t * 1000, o, h, l, c, v});
+  HSI.bars = [...m.values()].sort((a, b) => a.t - b.t);
+  HSI.pollOk = Date.now(); HSI.pollErr = ""; HSI.err = "";
+  const p = PAN("o2hsi"); if(p) p.dirty = true;
+}
+function hsiFeed(){
+  const now = Date.now(), eff = now - HSI_DELAY;
+  if(!hsiOpen(eff)) return null;
+  let s = Math.floor(eff / 60000) * 60000;
+  for(let i = 0; i < 1500 && hsiOpen(s - 60000); i++) s -= 60000;
+  const last = HSI.bars.length ? HSI.bars[HSI.bars.length-1].t + 30000 : 0, ref = Math.max(last, s), mins = ms => Math.round(ms / 60000);
+  if(now - HSI.pollOk > 120000)
+    return {short:`⚠ 轉接站連不上 ${mins(now - HSI.pollOk)} 分`, long:`超過 ${mins(now - HSI.pollOk)} 分鐘向轉接站要恆生資料都失敗（${HSI.pollErr || "連線錯誤"}）`};
+  if(eff - ref > 300000)
+    return {short:`⚠ 恆生中斷 ${mins(eff - ref)} 分`, long:`扣掉延遲 15 分鐘後，港期交易時段內已 ${mins(eff - ref)} 分鐘沒收到新的 30 秒 K，TradingView 的「恆生傳送」警報可能被停用了（港股假日也會出現這個警告）`};
+  return null;
+}
+function hsiGaps(){
+  const from = Date.now() - 86400000; let n = 0, ms = 0;
+  for(let i = 1; i < HSI.bars.length; i++){
+    const a = HSI.bars[i-1].t, b = HSI.bars[i].t;
+    if(a < from || b - a <= 90000) continue;
+    let open = true;
+    for(let t = a + 30000; t < b; t += 30000) if(!hsiOpen(t)){ open = false; break; }
+    if(open){ n++; ms += b - a; }
+  }
+  return {n, min:Math.round(ms / 60000)};
+}
 function txDecode(a, tf, adj, rt, adj2){   // rt＝換倉那根 K 的起點：那根以後改用 adj2
   const B = [], ms = tf * 1000; let t = a.length ? a[0] : 0, pc = 0;
   for(let i = 1; i < a.length; i += 6){
@@ -1830,7 +1891,8 @@ async function main(){
       // C 格 v1.10.0 刪除；Hyperliquid 仍要抓：H 格與交易明細的那斯達克換算要用
       loadHL(PAN("atr1")).catch(e => { $("wait-atr1").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
       loadTX().catch(e => { TX.err = "台指資料載入失敗：" + e.message + "，請重新整理"; for(const k of ["tx30", "tx37", "tx22", "o2tx"]) $("wait-" + k).textContent = TX.err; }),
-      pollTXL().catch(() => {}),   // 即時 K 拿不到時照舊只顯示盤後資料
+      pollTXL().catch(() => {}),
+      pollHSI().catch(e => { HSI.err = "恆生資料讀取失敗：" + e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }),   // v1.19.0   // 即時 K 拿不到時照舊只顯示盤後資料
       loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
   }catch(e){
@@ -1850,6 +1912,7 @@ async function main(){
   setInterval(gtrSave, 60000);
   setInterval(() => { loadDaily().catch(() => {}); }, 1800000);
   setInterval(() => { loadTX().catch(() => {}); }, 600000);   // 台指盤後資料：每 10 分鐘看總表有沒有更新
+  setInterval(() => { pollHSI().catch(e => { HSI.pollErr = e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }); }, 30000);   // v1.19.0 恆生
   // v1.18.0：失敗時也重畫台指各格，資料一停警告才跳得出來
   setInterval(() => { pollTXL().catch(e => { TX.pollErr = e.message; PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; }); }); }, 10000);
   mnqRate().catch(() => {}); setInterval(() => { mnqRate().catch(() => {}); }, 3600000);   // v1.13.0 匯率一天更新一次   // v1.12.0 台指即時 K（TradingView 約 15 秒送一批）
