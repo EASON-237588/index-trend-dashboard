@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.17.0</title>
+<title>期貨趨勢 v1.18.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -86,6 +86,9 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 .kv{flex:none;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mute);margin:2px 0 4px;white-space:nowrap;
   font-variant-numeric:tabular-nums}
 .kv .kvt{min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* v1.18.0 即時資料中斷警告：放在第二行最前面、不會被截掉；只用底色，不加光暈 */
+.feedw{flex:none;margin-right:6px;background:#c62828;color:#fff;border-radius:4px;padding:0 6px;font-size:12px;font-weight:700;line-height:17px}
+.feedg{flex:none;margin-right:6px;color:var(--warn);font-size:12px;font-weight:700;line-height:17px}
 .kv b{font-weight:400;color:var(--text)}
 /* v1.8.2：持有中的浮動點數放第二行最右邊，白底；賺紅字、虧綠字，不放百分比（使用者 2026-10-13 要求）。
    白底上原本的亮綠看不清楚，綠字改深一點。 */
@@ -162,7 +165,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.17.0";
+const VERSION = "v1.18.0";
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1052,7 +1055,13 @@ function renderInfo(p){
   if(e.t) parts.push(`進場 <b>${tText(e.t)}</b> @<b>${fmtP(p, e.price)}</b>`, p.src === "tx" ? txTo : `<b>${durText(Date.now() - e.t)}</b>`);
   else if(p.src === "tx") parts.push(txTo);
   parts.push(`${trigK} <b>${trig}</b>`);
-  $("kv-" + p.k).innerHTML = `<span class="kvt">${parts.join(" · ")}</span>` + flt;
+  let fw = "";   // v1.18.0 即時資料中斷／漏資料警告
+  if(p.src === "tx"){
+    const f = txFeed(), g = txGaps();
+    if(f) fw = `<span class="feedw" title="${f.long}">${f.short}</span>`;
+    if(g.n) fw += `<span class="feedg" title="盤後檔還沒補到的時段裡，即時 1 秒 K 有 ${g.n} 段缺超過 1 分鐘（共約 ${g.min} 分鐘）；盤後檔補上後就會被正本補齊">漏 ${g.n} 段</span>`;
+  }
+  $("kv-" + p.k).innerHTML = fw + `<span class="kvt">${parts.join(" · ")}</span>` + flt;
 }
 
 /* ============ v1.7.0 交易明細（取代曲線圖；使用者 2026-10-13 要求「只要有交易就自動更新」） ============
@@ -1652,7 +1661,7 @@ function gtrSave(){
    （in − out）（往回調整）讓趨勢線連續——近次月價差有 150 點以上，不平移的話換月那一刻一定翻向；
    交易明細則真的拆成兩筆、記「換倉」，多算一次來回成本。萬一換月那天的檔漏掉，退回用日界的次月價差平移。 */
 const TX = {bars:{}, span:{}, base:{}, baseSpan:{}, ready:false, upd:"", err:"", roll:false, rolls:{}, rollRows:[],
-            hold:false, lastC:"", upTo:0, live:[], liveN:{}, liveAt:0}, TX_START = Date.UTC(2026, 9, 5, 16);   // 台北 10/06 00:00
+            hold:false, lastC:"", upTo:0, live:[], liveN:{}, liveAt:0, pollOk:Date.now(), pollErr:""}, TX_START = Date.UTC(2026, 9, 5, 16);   // 台北 10/06 00:00
 /* v1.12.0 台指即時：TradingView 台指期 1 秒圖掛「台指即時傳送」腳本，警報每約 15 秒把 1 秒 K 送到轉接站 index-trend-tx
    （worker-tx\，只留 3 天）。這裡每 10 秒拿盤後檔最後一根之後的 1 秒 K，照 更新台指.py 的 bars() 同一套切法合成
    30／37／22 秒 K 接在盤後資料後面：以 1970 起整數秒切桶、只算交易時段、同一段開盤內 2 小時內沒成交補平盤 K。
@@ -1707,8 +1716,40 @@ async function pollTXL(){
   const m = new Map(TX.live.map(b => [b[0], b]));
   for(const b of d.bars) m.set(b[0], b);
   TX.live = [...m.values()].sort((a, b) => a[0] - b[0]);
-  TX.liveAt = d.at * 1000;
+  TX.liveAt = d.at * 1000; TX.pollOk = Date.now(); TX.pollErr = "";
   if(TX.ready) txMerge();
+}
+/* v1.18.0 即時資料監控（使用者 2026-10-18 要求）：TradingView 警報被自動停用時不會通知，
+   所以在這裡自己檢查——台指交易時段內超過 3 分鐘沒收到新的 1 秒 K（剛開盤 3 分鐘內不算）、
+   或超過 2 分鐘向轉接站要資料都失敗，台指各格第二行最前面亮紅底警告。
+   另外數「盤後檔還沒補到的那段」裡收到的 1 秒 K 中間缺超過 1 分鐘的段數（盤後檔補上的時段已經被正本補齊，不再算）。
+   台指 1 秒 K 幾乎每秒都有成交，試跑最長空洞 14 秒，所以 1 分鐘、3 分鐘的門檻不會誤報。 */
+function txSessStart(now){        // 這段開盤從幾點開始（每分鐘往回找到休市為止）
+  let s = Math.floor(now / 60000) * 60000;
+  for(let i = 0; i < 1500 && txOpen(s - 60000); i++) s -= 60000;
+  return s;
+}
+function txFeed(){
+  const now = Date.now();
+  if(!txOpen(now)) return null;
+  const last = TX.live.length ? TX.live[TX.live.length-1][0] * 1000 : 0;
+  const ref = Math.max(last, txSessStart(now)), mins = ms => Math.round(ms / 60000);
+  if(now - TX.pollOk > 120000)
+    return {short:`⚠ 轉接站連不上 ${mins(now - TX.pollOk)} 分`, long:`超過 ${mins(now - TX.pollOk)} 分鐘向轉接站要資料都失敗（${TX.pollErr || "連線錯誤"}），即時 K 沒有更新，訊號可能不準`};
+  if(now - ref > 180000)
+    return {short:`⚠ 即時中斷 ${mins(now - ref)} 分`, long:`交易時段內已 ${mins(now - ref)} 分鐘沒收到新的 1 秒 K，TradingView 的「台指即時傳送」警報可能被停用了，請到 TradingView 確認；在那之前訊號只到 ${last ? tText(last) : "盤後資料"}`};
+  return null;
+}
+function txGaps(){
+  const from = Math.max(TX.upTo, Date.now() - 86400000) / 1000; let n = 0, sec = 0;
+  for(let i = 1; i < TX.live.length; i++){
+    const a = TX.live[i-1][0], b = TX.live[i][0];
+    if(a < from || b - a <= 60) continue;
+    let open = true;
+    for(let t = a + 30; t < b; t += 30) if(!txOpen(t * 1000)){ open = false; break; }
+    if(open){ n++; sec += b - a; }
+  }
+  return {n, min:Math.round(sec / 60)};
 }
 function txDecode(a, tf, adj, rt, adj2){   // rt＝換倉那根 K 的起點：那根以後改用 adj2
   const B = [], ms = tf * 1000; let t = a.length ? a[0] : 0, pc = 0;
@@ -1809,7 +1850,8 @@ async function main(){
   setInterval(gtrSave, 60000);
   setInterval(() => { loadDaily().catch(() => {}); }, 1800000);
   setInterval(() => { loadTX().catch(() => {}); }, 600000);   // 台指盤後資料：每 10 分鐘看總表有沒有更新
-  setInterval(() => { pollTXL().catch(() => {}); }, 10000);
+  // v1.18.0：失敗時也重畫台指各格，資料一停警告才跳得出來
+  setInterval(() => { pollTXL().catch(e => { TX.pollErr = e.message; PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; }); }); }, 10000);
   mnqRate().catch(() => {}); setInterval(() => { mnqRate().catch(() => {}); }, 3600000);   // v1.13.0 匯率一天更新一次   // v1.12.0 台指即時 K（TradingView 約 15 秒送一批）
   setInterval(() => { pollSpot(PAN("gold11")).catch(() => {}); }, 20000);
   setInterval(() => { pollGate(PAN("gate")).catch(() => {}); }, 10000);
