@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>組別績效總表</title>
+<style>
+  :root { --fg:#111; --muted:#555; --line:#bbb; --bg:#fff; --pass:#e8f5e9; --fail:#fdecea; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --fg:#eee; --muted:#aaa; --line:#555; --bg:#161616; --pass:#1d3a24; --fail:#3d2020; }
+  }
+  :root[data-theme="dark"] { --fg:#eee; --muted:#aaa; --line:#555; --bg:#161616; --pass:#1d3a24; --fail:#3d2020; }
+  body { background: var(--bg); color: var(--fg); font-family: "Microsoft JhengHei", sans-serif; margin: 16px; line-height: 1.5; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 20px 0 6px; }
+  .meta { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  .wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: rgba(127,127,127,.15); white-space: nowrap; }
+  td.num { text-align: right; white-space: nowrap; }
+  tr.pass { background: var(--pass); }
+  tr.fail { background: var(--fail); }
+  .note { font-size: 13px; color: var(--muted); }
+  ol li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<h1>組別績效總表</h1>
+<div class="meta">
+  資料時間：2026/10/20 21:16 前後（讀取自期貨趨勢頁「交易明細」，該頁開著會自動更新，數字會隨時間變動）<br>
+  實際紀錄程式：本次執行結束（結束代碼 0），進出紀錄檔沒有新增列，舊列未改動。
+</div>
+
+<h2>一、績效表（台幣組依合計排名，黃金只在黃金內排名）</h2>
+<div class="wrap">
+<table>
+  <thead>
+    <tr>
+      <th>組別</th>
+      <th>已平倉（賺／賠）</th>
+      <th>合計（已實現）</th>
+      <th>獲利因子</th>
+      <th>勝率</th>
+      <th>獲利名次</th>
+      <th>篩選名次</th>
+      <th>未通過原因／備註</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="pass"><td>那斯達克・B2（37 秒）</td><td class="num">23（13／10）</td><td class="num">+154,377 台幣</td><td class="num">4.529</td><td class="num">56.5%</td><td class="num">1</td><td class="num">1</td><td>通過</td></tr>
+    <tr class="pass"><td>那斯達克・觀察二 555/23</td><td class="num">25（14／11）</td><td class="num">+145,705 台幣</td><td class="num">3.574</td><td class="num">56.0%</td><td class="num">2</td><td class="num">2</td><td>通過（表格列數 24，見註 1）</td></tr>
+    <tr class="pass"><td>台指・觀察二 台指</td><td class="num">23（11／12）</td><td class="num">+26,851 台幣</td><td class="num">2.638</td><td class="num">47.8%</td><td class="num">9</td><td class="num">3</td><td>通過</td></tr>
+    <tr class="pass"><td>那斯達克・B（30 秒）</td><td class="num">33（16／17）</td><td class="num">+72,240 台幣</td><td class="num">2.385</td><td class="num">48.5%</td><td class="num">6</td><td class="num">4</td><td>通過（表格列數 28，見註 1）</td></tr>
+    <tr class="pass"><td>那斯達克・A（30 秒）</td><td class="num">37（19／18）</td><td class="num">+78,474 台幣</td><td class="num">1.851</td><td class="num">51.4%</td><td class="num">5</td><td class="num">5</td><td>通過（表格列數 34，見註 1）</td></tr>
+    <tr class="pass"><td>台指・A/B</td><td class="num">27（12／15）</td><td class="num">+13,431 台幣</td><td class="num">1.504</td><td class="num">44.4%</td><td class="num">10</td><td class="num">6</td><td>通過（獲利因子僅略高於 1.5，門檻邊緣）</td></tr>
+    <tr><td>那斯達克・觀察二 37/37</td><td class="num">15（8／7）</td><td class="num">+91,586 台幣</td><td class="num">2.626</td><td class="num">53.3%</td><td class="num">3</td><td class="num">—</td><td>未通過：已平倉 15 筆，未達 20 筆</td></tr>
+    <tr><td>那斯達克・B3（22 秒）</td><td class="num">15（9／6）</td><td class="num">+88,822 台幣</td><td class="num">3.070</td><td class="num">60.0%</td><td class="num">4</td><td class="num">—</td><td>未通過：已平倉 15 筆，未達 20 筆</td></tr>
+    <tr><td>那斯達克・D2（6 分，通道 200 小時）</td><td class="num">4（3／1）</td><td class="num">+65,867 台幣</td><td class="num">4.191</td><td class="num">75.0%</td><td class="num">7</td><td class="num">—</td><td>未通過：已平倉 4 筆，未達 20 筆</td></tr>
+    <tr><td>那斯達克・D（6 分）</td><td class="num">4（2／2）</td><td class="num">+28,469 台幣</td><td class="num">2.033</td><td class="num">50.0%</td><td class="num">8</td><td class="num">—</td><td>未通過：已平倉 4 筆，未達 20 筆</td></tr>
+    <tr><td>台指・B2</td><td class="num">23（9／14）</td><td class="num">+11,441 台幣</td><td class="num">1.437</td><td class="num">39.1%</td><td class="num">11</td><td class="num">—</td><td>未通過：獲利因子 1.437，未達 1.5</td></tr>
+    <tr><td>台指・B3</td><td class="num">12（5／7）</td><td class="num">+9,429 台幣</td><td class="num">1.476</td><td class="num">41.7%</td><td class="num">12</td><td class="num">—</td><td>未通過：已平倉 12 筆，未達 20 筆；獲利因子 1.476，未達 1.5</td></tr>
+    <tr><td>那斯達克・I（2 分）</td><td class="num">0（0／0）</td><td class="num">0 台幣</td><td class="num">—</td><td class="num">—</td><td class="num">13</td><td class="num">—</td><td>未通過：尚無已平倉紀錄</td></tr>
+    <tr><td>恆生・觀察二 恆生</td><td class="num">0（0／0）</td><td class="num">0 台幣</td><td class="num">—</td><td class="num">—</td><td class="num">14</td><td class="num">—</td><td>未通過：尚無已平倉紀錄，資料仍在累積（見註 3）</td></tr>
+    <tr><td>那斯達克・G（30 秒，Gate）</td><td class="num">4（0／4）</td><td class="num">−42,290 台幣</td><td class="num">0.000</td><td class="num">0.0%</td><td class="num">15</td><td class="num">—</td><td>未通過：已平倉 4 筆，未達 20 筆；合計為負</td></tr>
+    <tr><td>那斯達克・H（1 分）</td><td class="num">3（0／3）</td><td class="num">−60,142 台幣</td><td class="num">0.000</td><td class="num">0.0%</td><td class="num">16</td><td class="num">—</td><td>未通過：已平倉 3 筆，未達 20 筆；合計為負</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>二、黃金組（美元計，只在黃金內排名）</h2>
+<div class="wrap">
+<table>
+  <thead>
+    <tr>
+      <th>組別</th>
+      <th>已平倉（賺／賠）</th>
+      <th>合計（已實現）</th>
+      <th>獲利因子</th>
+      <th>勝率</th>
+      <th>獲利名次</th>
+      <th>篩選名次</th>
+      <th>未通過原因／備註</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>黃金・F（11 分，空手放空）</td><td class="num">4（1／3）</td><td class="num">+230 美元</td><td class="num">2.217</td><td class="num">25.0%</td><td class="num">1</td><td class="num">—</td><td>未通過：已平倉 4 筆，未達 20 筆</td></tr>
+    <tr><td>黃金・E（8 分）</td><td class="num">2（1／1）</td><td class="num">+11 美元</td><td class="num">1.104</td><td class="num">50.0%</td><td class="num">2</td><td class="num">—</td><td>未通過：已平倉 2 筆，未達 20 筆；獲利因子未達 1.5</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>三、篩選結果</h2>
+<p class="note">條件：已平倉至少 20 筆、獲利因子至少 1.5、合計為正。通過者依獲利因子由高到低排名。</p>
+<ol>
+  <li>那斯達克・B2（37 秒）：獲利因子 4.529，已平倉 23 筆，合計 +154,377 台幣</li>
+  <li>那斯達克・觀察二 555/23：獲利因子 3.574，已平倉 25 筆，合計 +145,705 台幣</li>
+  <li>台指・觀察二 台指：獲利因子 2.638，已平倉 23 筆，合計 +26,851 台幣</li>
+  <li>那斯達克・B（30 秒）：獲利因子 2.385，已平倉 33 筆，合計 +72,240 台幣</li>
+  <li>那斯達克・A（30 秒）：獲利因子 1.851，已平倉 37 筆，合計 +78,474 台幣</li>
+  <li>台指・A/B：獲利因子 1.504，已平倉 27 筆，合計 +13,431 台幣（僅略高於門檻）</li>
+</ol>
+<p class="note">未通過 12 組（見表格「未通過原因」欄）：其中 B3、觀察二 37/37、D、D2、E、F、G、H、I 因已平倉筆數不足 20 筆；台指 B2、台指 B3 獲利因子低於 1.5；G、H 合計為負；I 與觀察二恆生尚無已平倉紀錄。</p>
+
+<h2>註</h2>
+<ol class="note">
+  <li><b>表格與摘要筆數對不上：</b>頁面摘要的已平倉筆數，與逐筆明細表的列數有差距：那斯達克 A（摘要 37 筆、表格 34 列）、B（33 對 28）、B2（23 對 20）、B3（15 對 14）、觀察二 555/23（25 對 24）、觀察二 37/37（15 對 14）、G（4 對 3）、H（3 對 2）。筆數與合計以摘要為準；獲利因子只能用表格列計算，所以這些組別的獲利因子是以較少的列算出來的，數字可能偏離。這是頁面本身的問題，需要回頭查頁面的計算或明細顯示。</li>
+  <li><b>台指組資料有缺口：</b>台指 A/B、台指 B2、台指 B3、觀察二 台指 的資料依待辦紀錄有缺口，這次沒有逐筆核對缺口位置，數字照頁面讀到的為準。</li>
+  <li><b>恆生資料還在累積：</b>觀察二 恆生 目前尚無已平倉紀錄，無法計算獲利因子與勝率。</li>
+  <li><b>黃金以美元計：</b>E、F 的盈虧以美元列出，獲利因子是比值，與換算台幣後相同。</li>
+  <li><b>合計為已實現：</b>合計欄取頁面的「已實現」數字，不含持有中的浮動盈虧。</li>
+  <li><b>與更新紀錄程式的輸出不同：</b>這次頁面讀到的數字與本次更新紀錄程式先前印出的數字不完全相同（例如觀察二 555/23 程式印出 27 筆、頁面為 25 筆），以頁面當下數字為準。</li>
+  <li><b>D、D2、E、F 的已平倉筆數都很少</b>（2 至 4 筆），目前結論不具統計意義。</li>
+</ol>
+
+<p class="note">本表只做績效整理與篩選，不構成任何投資建議。</p>
+
+</body>
+</html>
