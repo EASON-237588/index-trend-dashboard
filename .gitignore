@@ -5,3 +5,4 @@ worker/.wrangler/
 worker-tx/.wrangler/
 worker-tx/.dev.vars
 .claude/
+實際紀錄/快取/

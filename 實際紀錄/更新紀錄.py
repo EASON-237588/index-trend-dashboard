@@ -24,7 +24,7 @@
 
 只用 Python 內建模組，三台電腦都能直接跑。
 """
-import bisect, csv, io, json, os, sys, time, urllib.request, zipfile
+import bisect, csv, gzip, io, json, os, sys, time, urllib.request, zipfile
 from collections import deque
 from datetime import datetime, timedelta, timezone
 
@@ -124,6 +124,37 @@ def jget(url, data=None):
             if k >= 2: raise
         time.sleep(2 * (k + 1))
 
+# 原始資料快取（快取/*.json.gz）：每次只補快取尾端之後的部分，不用每次從頭重抓。
+# 快取是各台電腦自己的，不進版本控制（.gitignore 已排除）。
+CACHE = os.path.join(HERE, "快取")
+
+def cache_load(name):
+    try:
+        with gzip.open(os.path.join(CACHE, name + ".json.gz"), "rt", encoding="utf-8") as f: return json.load(f)
+    except (OSError, ValueError): return None
+
+def cache_save(name, obj):
+    os.makedirs(CACHE, exist_ok=True)
+    p = os.path.join(CACHE, name + ".json.gz"); tmp = p + ".tmp"
+    with gzip.open(tmp, "wt", encoding="utf-8") as f: json.dump(obj, f, separators=(",", ":"))
+    os.replace(tmp, p)
+
+def cached_1m(name, since, fetch, limit):
+    """1 分 K 快取。快取起點不晚於 since 時，從快取最後一根（可能還沒收盤，所以會重抓覆蓋）往後補；否則整段重抓。"""
+    c = cache_load(name)
+    if c and c["from"] <= since:
+        start_from = c["from"]; rows = {r[0]: tuple(r) for r in c["rows"]}; st = max(rows) if rows else since
+    else:
+        start_from = since; rows = {}; st = since
+    while st < NOW:
+        ch = fetch(st)
+        if not ch: break
+        for r in ch: rows[r[0]] = r
+        st = int(ch[-1][0]) + 60000
+        if len(ch) < limit: break
+    cache_save(name, {"from": start_from, "rows": sorted(rows.values())})
+    return [r for r in sorted(rows.values()) if r[0] >= since]
+
 def agg_session(raw, tf):
     out = []; cur = None
     for t, o, h, l, c, v in raw:
@@ -139,23 +170,28 @@ def agg_session(raw, tf):
 
 def bars_A(since):
     """QQQUSDT 逐筆 → 30 秒 K。完整日用 data.binance.vision 每日檔，剩下的用介面依編號往後抓。"""
-    trades = []; day = datetime.fromtimestamp(since / 1000, timezone.utc).date(); last_id = None
-    while True:
-        u = f"https://data.binance.vision/data/futures/um/daily/aggTrades/QQQUSDT/QQQUSDT-aggTrades-{day}.zip"
-        try:
-            raw = urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=60).read()
-        except Exception:
-            break
-        with zipfile.ZipFile(io.BytesIO(raw)) as z:
-            for row in csv.reader(io.TextIOWrapper(z.open(z.namelist()[0]), "utf-8")):
-                if not row[0].isdigit(): continue
-                trades.append((int(row[5]), float(row[1]), float(row[2]))); last_id = int(row[0])
-        day += timedelta(days=1)
-    if last_id is None:  # 每日檔還沒出：從現在往回抓到 since
-        top = jget(f"{FAPI}/aggTrades?symbol=QQQUSDT&limit=1")[0]["a"]; fid = top
+    c = cache_load("qqq_trades")
+    if c and c["from"] <= since and c.get("last_id") is not None:  # 快取有資料：只從上次的成交編號往後補
+        trades = [tuple(x) for x in c["trades"]]; last_id = c["last_id"]; from_ = c["from"]
+    else:
+        trades = []; from_ = since; last_id = None
+        day = datetime.fromtimestamp(since / 1000, timezone.utc).date()
         while True:
-            fid -= 1000; ch = jget(f"{FAPI}/aggTrades?symbol=QQQUSDT&fromId={max(fid,0)}&limit=1000")
-            if not ch or ch[0]["T"] < since: last_id = ch[0]["a"] - 1 if ch else fid; break
+            u = f"https://data.binance.vision/data/futures/um/daily/aggTrades/QQQUSDT/QQQUSDT-aggTrades-{day}.zip"
+            try:
+                raw = urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=60).read()
+            except Exception:
+                break
+            with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                for row in csv.reader(io.TextIOWrapper(z.open(z.namelist()[0]), "utf-8")):
+                    if not row[0].isdigit(): continue
+                    trades.append((int(row[5]), float(row[1]), float(row[2]))); last_id = int(row[0])
+            day += timedelta(days=1)
+        if last_id is None:  # 每日檔還沒出：從現在往回抓到 since
+            top = jget(f"{FAPI}/aggTrades?symbol=QQQUSDT&limit=1")[0]["a"]; fid = top
+            while True:
+                fid -= 1000; ch = jget(f"{FAPI}/aggTrades?symbol=QQQUSDT&fromId={max(fid,0)}&limit=1000")
+                if not ch or ch[0]["T"] < since: last_id = ch[0]["a"] - 1 if ch else fid; break
     n = 0
     while True:
         ch = jget(f"{FAPI}/aggTrades?symbol=QQQUSDT&fromId={last_id + 1}&limit=1000")
@@ -163,6 +199,7 @@ def bars_A(since):
         trades += [(x["T"], float(x["p"]), float(x["q"])) for x in ch]; last_id = ch[-1]["a"]; n += 1
         if len(ch) < 1000: break
         if n % 50 == 0: time.sleep(1)
+    cache_save("qqq_trades", {"from": from_, "last_id": last_id, "trades": [list(x) for x in trades]})
     trades.sort()
     B = []
     for T, p, q in trades:
@@ -189,12 +226,19 @@ def gate_trades(since):
             m = (a + b) // 2
             return page(a, m) + page(m, b)
         return j
-    end = NOW // 1000; segs = [(t, min(end, t + 900)) for t in range(since // 1000, end, 900)]
-    tr = {}
+    end = NOW // 1000
+    c = cache_load("gate_trades")
+    if c and c["from"] <= since:  # 快取：從快取最後一筆前 60 秒往後補（重疊部分靠成交編號去重）
+        tr = {x[0]: tuple(x[1:]) for x in c["trades"]}; from_ = c["from"]
+        start = (max(v[0] for v in tr.values()) // 1000 - 60) if tr else since // 1000
+    else:
+        tr = {}; from_ = since; start = since // 1000
+    segs = [(t, min(end, t + 900)) for t in range(start, end, 900)]
     with ThreadPoolExecutor(8) as ex:
         for part in ex.map(lambda s: page(*s), segs):
             for x in part:
                 tr[x["id"]] = (int(float(x["create_time"]) * 1000), float(x["price"]), abs(float(x["size"])))
+    cache_save("gate_trades", {"from": from_, "trades": [[k] + list(v) for k, v in tr.items()]})
     return sorted(tr.values())
 
 def bars_G(since, tf=30, tr=None):
@@ -240,25 +284,20 @@ def bars_C(sym):
     raw = pseudo + [b for b in b5 if b[0] < s2] + b2
     return agg_session(raw, 6), s5
 
+def _fetch_xau(st):
+    ch = jget(f"{FAPI}/klines?symbol=XAUUSDT&interval=1m&limit=1500&startTime={st}")
+    return [(int(k[0]), float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])) for k in ch]
+
 def bars_D(since):
-    out = []; st = since
-    while st < NOW:
-        ch = jget(f"{FAPI}/klines?symbol=XAUUSDT&interval=1m&limit=1500&startTime={st}")
-        if not ch: break
-        out += [(int(k[0]), float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])) for k in ch]
-        st = int(ch[-1][0]) + 60000
-        if len(ch) < 1500: break
-    return agg_session(out, 8)
+    return agg_session(cached_1m("xau_1m", since, _fetch_xau, 1500), 8)
+
+def _fetch_paxg(st):
+    ch = jget(f"https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=1m&limit=1000&startTime={st}")
+    return [(int(k[0]), float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])) for k in ch]
 
 def bars_E(since):
     """Binance 現貨 PAXGUSDT 1 分 → 11 分（24 小時，時間桶從 1970 起算，同儀表板 aggAll）。只留已收盤的 K。"""
-    out = []; st = since
-    while st < NOW:
-        ch = jget(f"https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=1m&limit=1000&startTime={st}")
-        if not ch: break
-        out += [(int(k[0]), float(k[1]), float(k[2]), float(k[3]), float(k[4]), float(k[5])) for k in ch]
-        st = int(ch[-1][0]) + 60000
-        if len(ch) < 1000: break
+    out = cached_1m("paxg_1m", since, _fetch_paxg, 1000)
     ms11 = 11 * 60000; B = []
     for t, o, h, l, c, v in out:
         s = t // ms11 * ms11
