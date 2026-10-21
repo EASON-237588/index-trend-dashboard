@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.23.2</title>
+<title>期貨趨勢 v1.23.3</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -175,7 +175,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.23.2";   // v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.23.3";   // v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1106,10 +1106,10 @@ const TRADE_K = [
   {k:"D", pk:"gold8",  name:"E 黃金", unit:"美元", d:2},
   {k:"E", pk:"gold11", name:"F 黃金", unit:"美元", d:2},
   // v1.11.0 台指三組：沒有正式紀錄檔，從 10/6 起整段用格子自己算的部位（self）
-  {k:"TX1", pk:"tx30", blink:true, name:"台指 A/B", unit:"點", self:true},
+  {k:"TX1", pk:"tx30", name:"台指 A/B", unit:"點", self:true},   // v1.23.3 使用者要求明細不閃爍
   {k:"TX2", pk:"tx37", name:"台指 B2", unit:"點", self:true},
   {k:"TX3", pk:"tx22", name:"台指 B3", unit:"點", self:true},
-  {k:"TX4", pk:"o2tx", blink:true, name:"觀察二 台指", unit:"點", self:true},   // v1.17.0 觀察二的微台 30 秒 555/23
+  {k:"TX4", pk:"o2tx", name:"觀察二 台指", unit:"點", self:true},   // v1.23.3 使用者要求明細不閃爍   // v1.17.0 觀察二的微台 30 秒 555/23
   {k:"O1", pk:"o2nq", blink:true, name:"觀察二 那斯達克 555/23", unit:"點"},     // v1.19.0 紀錄程式 O1，10/6 起回算
   {k:"O2", pk:"o2nq37", blink:true, name:"觀察二 那斯達克 37/37", unit:"點"},    // v1.19.0 紀錄程式 O2
   {k:"HSI", pk:"o2hsi", blink:true, name:"觀察二 恆生", unit:"點", self:"hsi"},  // v1.19.0 網頁自算（TradingView 警報資料暖機完成起）
