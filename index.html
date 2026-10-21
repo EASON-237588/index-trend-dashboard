@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.22.0</title>
+<title>期貨趨勢 v1.22.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -175,7 +175,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.22.0";   // v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.22.1";   // v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1077,7 +1077,7 @@ function renderInfo(p){
   $("px-" + p.k).innerHTML = fmtP(p, lastPx);
   const parts = [];
   // 台指是盤後資料，持有時間算到現在不準；改放「資料到幾點」，手機上才不會被截掉（v1.12.0 有即時 K 時寫「即時到」）
-  const txTo = p.src === "tx" && TX.useTW ? `連續月到 <b>${tText(last.t)}</b>`
+  const txTo = p.src === "tx" && TX.useTW ? `${TX.src === "tw" ? "連續月" : "TradingView"}到 <b>${tText(last.t)}</b>`
     : p.src === "tx"
     ? `${TX.liveN[p.tfSec] ? "即時到" : "盤後到"} <b>${tText(last.t)}</b>` +
       (TX.hold ? `<span title="換月日 TradingView 的即時 K 可能還是舊合約，差 150 點以上，所以先只看盤後資料">（換月中）</span>` : "")
@@ -1879,12 +1879,18 @@ async function pollTW(){
   if(twOn() || TX.ready) txMerge();
 }
 function txMerge(){
-  if(twOn()){   // v1.22.0 TradingView 連續月 30 秒 K
-    TX.useTW = true; TX.hold = false;
-    for(const tf of ["30", "37", "22"]){ TX.bars[tf] = TW.bars; TX.liveN[tf] = 0; TX.span[tf] = TW.bars.length; }
+  // v1.22.1 台指 K 線一律用 TradingView（使用者 10/21：「不是用 TV 嗎？」）：
+  // 優先用連續月 30 秒（/tw，台指傳送警報），還沒有就用台指即時傳送的 1 秒 K 合成 30 秒（轉接站留 3 天），
+  // 兩者都沒有才退回期交所盤後檔。四格都畫同一份 30 秒 K（848 四格策略都是 30 秒）。
+  const src = twOn() ? "tw" : TX.live.length >= 3600 ? "tv1s" : "";
+  if(src){
+    const B = src === "tw" ? TW.bars : txLiveBars(30, []);
+    TX.useTW = true; TX.src = src; TX.hold = false;
+    for(const tf of ["30", "37", "22"]){ TX.bars[tf] = B; TX.liveN[tf] = 0; TX.span[tf] = B.length; }
     PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; });
     return;
   }
+  TX.src = "";
   TX.useTW = false;
   TX.hold = txHoldLive();
   for(const tf in TX.base){
@@ -1900,7 +1906,7 @@ async function pollTXL(){
   for(const b of d.bars) m.set(b[0], b);
   TX.live = [...m.values()].sort((a, b) => a[0] - b[0]);
   TX.liveAt = d.at * 1000; TX.pollOk = Date.now(); TX.pollErr = "";
-  if(TX.ready) txMerge();
+  txMerge();   // v1.22.1 不必等盤後檔，TradingView 1 秒 K 夠了就直接畫
 }
 /* v1.18.0 即時資料監控（使用者 2026-10-18 要求）：TradingView 警報被自動停用時不會通知，
    所以在這裡自己檢查——台指交易時段內超過 3 分鐘沒收到新的 1 秒 K（剛開盤 3 分鐘內不算）、
@@ -1915,7 +1921,7 @@ function txSessStart(now){        // 這段開盤從幾點開始（每分鐘往�
 function txFeed(){
   const now = Date.now();
   if(!txOpen(now)) return null;
-  if(TX.useTW){   // v1.22.0 改看 TradingView 連續月 30 秒 K
+  if(TX.useTW && TX.src === "tw"){   // v1.22.0 改看 TradingView 連續月 30 秒 K（用 1 秒 K 時照下面舊的判斷）
     const last = TW.bars[TW.bars.length-1].t + 30000, ref = Math.max(last, txSessStart(now)), mins = ms => Math.round(ms / 60000);
     if(now - TW.pollOk > 120000) return {short:`⚠ 轉接站連不上 ${mins(now - TW.pollOk)} 分`, long:`超過 ${mins(now - TW.pollOk)} 分鐘向轉接站要資料都失敗（${TW.pollErr || "連線錯誤"}）`};
     if(now - ref > 180000) return {short:`⚠ 即時中斷 ${mins(now - ref)} 分`, long:`交易時段內已 ${mins(now - ref)} 分鐘沒收到新的 30 秒 K，TradingView 的「台指傳送」警報可能被停用了，請到 TradingView 確認`};
