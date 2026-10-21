@@ -1,0 +1,26 @@
+//@version=6
+// 期貨趨勢・台指傳送（2026-10-21，連續月）
+// 使用者定：台指訊號與資料一律以 TradingView 為準、一律連續月。
+// 掛在微型台指期（TAIFEX:TMF1!）30 秒圖，圖表要開「依合約變更調整」（右下角 B-ADJ 亮起）。
+// 每根 30 秒 K 收盤送一則警報到轉接站 tw：最新 3 根（漏送一次下一則會補）＋一段補歷史
+// （每次 40 根，從 4,800 根前往現在補，約 60 分鐘一輪，補完再從頭循環）。
+// 換約時 TradingView 會把舊 K 棒整段平移；循環補送會把轉接站裡的舊 K 棒以時間覆蓋成平移後的價格，所以存下來的一律是連續月。
+// 警報設定：條件選這支腳本的「任何 alert() 函式呼叫」，通知只勾「網址」，
+// 網址填 https://index-trend-tx.eason-237588.workers.dev/tw/push?k=密碼（密碼同台指那一組，在 worker-tx\.dev.vars）。
+// 一分鐘兩次，在 TradingView 對太頻繁觸發的警報自動停用的門檻內。
+// 刻意少用縮排：用程式塞進 TradingView 編輯器時，縮排會一行一行疊加亂掉。
+indicator("台指傳送", overlay = true, max_bars_back = 4800)
+var int back = 4800
+ok = barstate.isrealtime and barstate.isconfirmed
+string s = ""
+for k = 0 to 2
+    s := s + (k == 0 ? "" : ",") + "[" + str.tostring(math.floor(time[k] / 1000)) + "," + str.tostring(open[k]) + "," + str.tostring(high[k]) + "," + str.tostring(low[k]) + "," + str.tostring(close[k]) + "," + str.tostring(nz(volume[k])) + "]"
+top = math.min(4800, bar_index)
+hi = math.min(back, top)
+lo = math.max(hi - 39, 3)
+if ok and hi >= lo
+    for k = hi to lo
+        s := s + ",[" + str.tostring(math.floor(time[k] / 1000)) + "," + str.tostring(open[k]) + "," + str.tostring(high[k]) + "," + str.tostring(low[k]) + "," + str.tostring(close[k]) + "," + str.tostring(nz(volume[k])) + "]"
+if ok
+    back := hi >= lo and lo - 1 > 3 ? lo - 1 : top
+    alert("{\"s\":\"" + syminfo.ticker + "\",\"b\":[" + s + "]}", alert.freq_all)

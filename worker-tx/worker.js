@@ -8,7 +8,9 @@
    2026-10-18 加恆生：小型恆生期貨 30 秒圖掛「恆生傳送」腳本，POST /hsi/push?k=密碼（同一組密碼）、GET /hsi?since=秒，
    存在另一個 Durable Object（名稱 hsi），跟台指分開。恆生沒有盤後檔可補，策略暖機要約 2 個交易日，所以留 10 天。 */
 const ALLOW = [/^https:\/\/eason-237588\.github\.io$/, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/];
-const FEEDS = {tx: {keep: 3 * 86400, sym: "TXF1!"}, hsi: {keep: 10 * 86400, sym: "MHI1!"}};   // 保留秒數
+// 2026-10-21 加 tw：台指以 TradingView 為準、一律連續月（使用者定）。微型台指 TMF1! 30 秒圖開「依合約變更調整」，
+// 掛「台指傳送」腳本循環補送舊 K 棒；換約後補送的就是平移後的價格，以 K 棒時間覆蓋，約 70 分鐘整段換成連續月。
+const FEEDS = {tx: {keep: 3 * 86400, sym: "TXF1!"}, hsi: {keep: 10 * 86400, sym: "MHI1!"}, tw: {keep: 4 * 86400, sym: "TMF1!"}};   // 保留秒數
 
 function cors(origin){
   const ok = origin && ALLOW.some(re => re.test(origin));
@@ -52,7 +54,7 @@ export default {
   async fetch(req, env){
     const origin = req.headers.get("Origin");
     const url = new URL(req.url);
-    const m0 = url.pathname.match(/^\/(tx|hsi)(\/push)?$/);
+    const m0 = url.pathname.match(/^\/(tx|hsi|tw)(\/push)?$/);
     if(!m0) return new Response("not found", {status: 404});
     const name = m0[1], F = FEEDS[name];
     const stub = env.TX.get(env.TX.idFromName(name));

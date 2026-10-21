@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.21.0</title>
+<title>期貨趨勢 v1.22.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -175,7 +175,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.21.0";   // v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.22.0";   // v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -917,8 +917,8 @@ function recompute(p){
     }
   }else if(p.src === "tx"){
     // v1.11.0 台指：盤後資料檔，每根都已收完；v1.12.0 接上即時 K，最後一根要等後面有新的 1 秒 K 才算收完
-    if(!TX.ready) return;
-    B = TX.bars[p.tfSec]; p.done = B.length;
+    if(!TX.ready && !TX.useTW) return;
+    B = TX.bars[p.tfSec]; if(!B || !B.length) return; p.done = B.length;
     if(TX.liveN[p.tfSec] && TX.live.length && B[B.length-1].t + p.tfSec * 1000 > TX.live[TX.live.length-1][0] * 1000) p.done = B.length - 1;
     if(!p.userZoom) p.view.span = p.span = TX.span[p.tfSec];
   }else if(p.src === "hl"){
@@ -1077,7 +1077,8 @@ function renderInfo(p){
   $("px-" + p.k).innerHTML = fmtP(p, lastPx);
   const parts = [];
   // 台指是盤後資料，持有時間算到現在不準；改放「資料到幾點」，手機上才不會被截掉（v1.12.0 有即時 K 時寫「即時到」）
-  const txTo = p.src === "tx"
+  const txTo = p.src === "tx" && TX.useTW ? `連續月到 <b>${tText(last.t)}</b>`
+    : p.src === "tx"
     ? `${TX.liveN[p.tfSec] ? "即時到" : "盤後到"} <b>${tText(last.t)}</b>` +
       (TX.hold ? `<span title="換月日 TradingView 的即時 K 可能還是舊合約，差 150 點以上，所以先只看盤後資料">（換月中）</span>` : "")
     : p.src === "hsi" ? `資料到 <b>${tText(last.t)}</b>（延遲約 15 分）` : "";
@@ -1784,7 +1785,8 @@ const TX_LIVE = "https://index-trend-tx.eason-237588.workers.dev/tx";
 const TVS = {data:null, upd:"", err:""}, TXK = {tx30:"TX1", tx37:"TX2", tx22:"TX3", o2tx:"TX4"};
 const tvTime = s => { const m = /(\d+)-(\d+)-(\d+) (\d+):(\d+)(?::(\d+))?/.exec(s); return Date.UTC(+m[1], m[2] - 1, +m[3], m[4] - 8, +m[5], +(m[6] || 0)); };
 const tvGroup = k => TVS.data && TVS.data.groups[k];
-const txNow = () => TX.live.length ? TX.live[TX.live.length-1][4] : null;   // TradingView 即時傳來的最新價
+const txNow = () => typeof TW !== "undefined" && twOn() ? TW.bars[TW.bars.length-1].c
+  : TX.live.length ? TX.live[TX.live.length-1][4] : null;   // TradingView 傳來的最新價（v1.22.0 優先用連續月 30 秒 K）
 async function loadTVS(){
   const d = await jget("台指/tv_signals.json?t=" + Date.now());
   if(d.upd === TVS.upd) return;
@@ -1823,7 +1825,7 @@ function tradesTV(T){
     const now = txNow();
     if(now != null){ const g = (now - L.p) * L.side; Object.assign(op, {now, pts:g, pct:g / L.p * 100}); }
   }
-  const upTo = Math.max(TVS.updT || 0, TX.live.length ? TX.live[TX.live.length-1][0] * 1000 : 0);
+  const upTo = Math.max(TVS.updT || 0, twOn() ? TW.bars[TW.bars.length-1].t : TX.live.length ? TX.live[TX.live.length-1][0] * 1000 : 0);
   return {cnt, win, pts, pct, op, trades, gap:false, ready:true, upTo, first:null};
 }
 function txOpen(t){   // 同 更新台指.py 的 tx_open（台北時間）
@@ -1859,7 +1861,31 @@ function txHoldLive(){            // 換月窗內（盤後檔還沒補到換倉�
   const r = txRollAt(TX.lastC);
   return Date.now() >= r.start && TX.upTo < r.rt;
 }
+/* v1.22.0 台指 K 線也改 TradingView 連續月（使用者 2026-10-21「全部都是連續月」）：轉接站 /tw 存的是 TMF1! 30 秒圖
+   （依合約變更調整）掛「台指傳送」送來的 K 棒，循環補送會把舊 K 棒覆蓋成平移後的價格。收到 200 根以上就改用它畫台指四格
+   （848 四格策略本來就都是 30 秒），盤後檔與 1 秒 K 退為備援；四格都畫同一份 30 秒 K。
+   補送會改到舊 K 棒，所以每 5 分鐘整包重抓一次，平常每 30 秒只拿最後兩分鐘。 */
+const TW = {bars:[], at:0, pollOk:Date.now(), pollErr:"", full:0}, TW_LIVE = TX_LIVE.replace(/\/tx$/, "/tw"), TW_MIN = 200;
+const twOn = () => TW.bars.length >= TW_MIN;
+async function pollTW(){
+  const fullNow = !TW.bars.length || Date.now() - TW.full > 300000;
+  const since = fullNow ? 0 : Math.floor(TW.bars[TW.bars.length-1].t / 1000) - 120;
+  const d = await jget(`${TW_LIVE}?since=${since}`);
+  const m = fullNow ? new Map() : new Map(TW.bars.map(b => [b.t, b]));
+  for(const [t, o, h, l, c, v] of d.bars) m.set(t * 1000, {t:t * 1000, o, h, l, c, v});
+  TW.bars = [...m.values()].sort((a, b) => a.t - b.t);
+  if(fullNow) TW.full = Date.now();
+  TW.at = d.at * 1000; TW.pollOk = Date.now(); TW.pollErr = "";
+  if(twOn() || TX.ready) txMerge();
+}
 function txMerge(){
+  if(twOn()){   // v1.22.0 TradingView 連續月 30 秒 K
+    TX.useTW = true; TX.hold = false;
+    for(const tf of ["30", "37", "22"]){ TX.bars[tf] = TW.bars; TX.liveN[tf] = 0; TX.span[tf] = TW.bars.length; }
+    PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; });
+    return;
+  }
+  TX.useTW = false;
   TX.hold = txHoldLive();
   for(const tf in TX.base){
     const L = TX.hold ? [] : txLiveBars(+tf, TX.base[tf]);
@@ -1889,6 +1915,12 @@ function txSessStart(now){        // 這段開盤從幾點開始（每分鐘往�
 function txFeed(){
   const now = Date.now();
   if(!txOpen(now)) return null;
+  if(TX.useTW){   // v1.22.0 改看 TradingView 連續月 30 秒 K
+    const last = TW.bars[TW.bars.length-1].t + 30000, ref = Math.max(last, txSessStart(now)), mins = ms => Math.round(ms / 60000);
+    if(now - TW.pollOk > 120000) return {short:`⚠ 轉接站連不上 ${mins(now - TW.pollOk)} 分`, long:`超過 ${mins(now - TW.pollOk)} 分鐘向轉接站要資料都失敗（${TW.pollErr || "連線錯誤"}）`};
+    if(now - ref > 180000) return {short:`⚠ 即時中斷 ${mins(now - ref)} 分`, long:`交易時段內已 ${mins(now - ref)} 分鐘沒收到新的 30 秒 K，TradingView 的「台指傳送」警報可能被停用了，請到 TradingView 確認`};
+    return null;
+  }
   const last = TX.live.length ? TX.live[TX.live.length-1][0] * 1000 : 0;
   const ref = Math.max(last, txSessStart(now)), mins = ms => Math.round(ms / 60000);
   if(now - TX.pollOk > 120000)
@@ -1898,6 +1930,7 @@ function txFeed(){
   return null;
 }
 function txGaps(){
+  if(TX.useTW) return {n:0, min:0};   // v1.22.0 連續月資料由 TradingView 循環補送，不再數 1 秒 K 的缺口
   const from = Math.max(TX.upTo, Date.now() - 86400000) / 1000; let n = 0, sec = 0;
   for(let i = 1; i < TX.live.length; i++){
     const a = TX.live[i-1][0], b = TX.live[i][0];
@@ -2033,6 +2066,7 @@ async function main(){
       loadTX().catch(e => { TX.err = "台指資料載入失敗：" + e.message + "，請重新整理"; for(const k of ["tx30", "tx37", "tx22", "o2tx"]) $("wait-" + k).textContent = TX.err; }),
       pollTXL().catch(() => {}),
       loadTVS().catch(e => { TVS.err = "TradingView 訊號檔讀取失敗：" + e.message + "，請重新整理"; tradeSig = ""; }),   // v1.21.0
+      pollTW().catch(e => { TW.pollErr = e.message; }),   // v1.22.0 台指連續月 30 秒 K
       pollHSI().catch(e => { HSI.err = "恆生資料讀取失敗：" + e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }),   // v1.19.0   // 即時 K 拿不到時照舊只顯示盤後資料
       loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
@@ -2054,6 +2088,7 @@ async function main(){
   setInterval(() => { loadDaily().catch(() => {}); }, 1800000);
   setInterval(() => { loadTX().catch(() => {}); }, 600000);   // 台指盤後資料：每 10 分鐘看總表有沒有更新
   setInterval(() => { loadTVS().catch(() => {}); }, 300000);  // v1.21.0 TradingView 訊號檔：每 5 分鐘重讀
+  setInterval(() => { pollTW().catch(e => { TW.pollErr = e.message; PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; }); }); }, 30000);   // v1.22.0
   setInterval(() => { pollHSI().catch(e => { HSI.pollErr = e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }); }, 30000);   // v1.19.0 恆生
   // v1.18.0：失敗時也重畫台指各格，資料一停警告才跳得出來
   setInterval(() => { pollTXL().catch(e => { TX.pollErr = e.message; PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; }); }); }, 10000);
