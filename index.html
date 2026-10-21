@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.20.4</title>
+<title>期貨趨勢 v1.21.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -175,7 +175,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.20.4";   // v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.21.0";   // v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -952,6 +952,7 @@ function recompute(p){
   if(p.kind === "atr" && !DAILY) return;
   p.R = p.kind === "rf" ? calcRF(done, p.P) : p.kind === "atr" ? calcAtrRev(done, p.P) : p.goldExact ? calcDonG(done, p.P) : calcDon(done, p.P);
   if(p.flatShort) toFlatShort(p.R);
+  if(p.src === "tx") tvOverride(p);   // v1.21.0 台指部位以 TradingView 為準
   p.ready = true;
   $("wait-" + p.k).hidden = true;
 }
@@ -1011,6 +1012,10 @@ function buildDOM(){
 }
 
 function entryOf(p){
+  if(p.src === "tx"){   // v1.21.0 台指：持倉與進場點照 TradingView 最後一筆
+    const G = tvGroup(TXK[p.k]);
+    if(G){ const L = G.flips[G.flips.length-1]; return L && G.open ? {side:L.side, t:L.t, price:L.p} : {side:0}; }
+  }
   const R = p.R; if(!R || !p.done) return null;
   const side = R.pos[p.done - 1];
   if(!side) return {side:0};
@@ -1034,12 +1039,14 @@ function renderInfo(p){
 
   // 浮動點數：那斯達克兩格用換算後的那斯達克點數（跟交易明細一樣），換算比例還沒出來就先不顯示
   let flt = "";
+  // v1.21.0 台指的進場價是 TradingView 平移後的價格，現價也要用 TradingView 即時價才對得起來
+  const lastPx = p.src === "tx" && txNow() != null ? txNow() : last.c;
   if(e.side && e.price && (!p.nq || RATIO)){
     const T = TRADE_K.find(x => x.pk === p.k), d = T && T.d || 0;
-    const v = (fx(p, last.c) - fx(p, e.price)) * e.side;
+    const v = (fx(p, lastPx) - fx(p, e.price)) * e.side;
     // v1.13.0 那斯達克改顯示微型那斯達克 1 口的台幣（已扣來回手續費），點數放滑鼠提示
     const C = costOf(T);   // v1.14.0 台指也換算（微台）
-    if(C){ const nt = C.nt(v, e.price, last.c); flt = `<span class="flt ${ud(Math.round(nt))}" title="${sgn(v)} 點">${ntFmt(nt)}</span>`; }
+    if(C){ const nt = C.nt(v, e.price, lastPx); flt = `<span class="flt ${ud(Math.round(nt))}" title="${sgn(v)} 點">${ntFmt(nt)}</span>`; }
     else flt = `<span class="flt ${ud(+v.toFixed(d))}">${sgn(v, d)}</span>`;
   }
   // 下一個會讓部位改變的價位
@@ -1067,7 +1074,7 @@ function renderInfo(p){
       trigK = p.flatShort ? "翻多線" : "進場線"; trig = fmtP(p, hi(look));
     }
   }
-  $("px-" + p.k).innerHTML = fmtP(p, last.c);
+  $("px-" + p.k).innerHTML = fmtP(p, lastPx);
   const parts = [];
   // 台指是盤後資料，持有時間算到現在不準；改放「資料到幾點」，手機上才不會被截掉（v1.12.0 有即時 K 時寫「即時到」）
   const txTo = p.src === "tx"
@@ -1149,6 +1156,7 @@ async function loadLog(){
   logBusy = false; tradeSig = ""; renderTrades();
 }
 function tradesOf(T){
+  if(T.self === true) return tradesTV(T);   // v1.21.0 台指四組：照 TradingView 交易清單
   const p = PAN(T.pk);
   let rows;
   if(T.self){
@@ -1277,7 +1285,7 @@ function renderTradesNT(T, C){
     <div class="tnote">${C.name === "tx"
       ? `微台 1 口・每點 ${TMF.mult} 元・每邊手續費
       <input id="tmfFee" type="number" step="1" min="0" value="${TMF.fee}" style="width:52px"> 元・期交稅十萬分之二（買賣各一次）<br>
-      未扣滑價・2026/10/06 起回算・期交所每日逐筆檔＋TradingView 即時，資料到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新${TX.roll ? "・換月日 13:25 平舊約、同一刻市價進新約（多算一次來回成本）；換倉前的價格照換倉價差平移，盈虧點數不受影響" : ""}${TX.hold ? "<br>換月中：TradingView 的即時 K 可能還是舊合約（差 150 點以上），先只用盤後資料，盤後檔補到換倉點就自動恢復" : ""}`
+      未扣滑價・訊號來源 TradingView 848 版面（依合約變更調整＝連續月），2026/10/06 起・訊號更新到 ${TVS.upd || "—"}・現價用 TradingView 即時價・價格為 TradingView 換約平移後的價格，盈虧點數不受影響`
       : `微型那斯達克 1 口・每點 ${MNQ.mult} 美元・單邊手續費
       <input id="mnqFee" type="number" step="0.1" min="0" value="${MNQ.fee}" style="width:52px"> 美元・匯率
       <input id="mnqRate" type="number" step="0.01" min="20" max="50" placeholder="${ratePh}" value="${MNQ.rateAuto ? "" : MNQ.rate}" style="width:64px">
@@ -1321,7 +1329,7 @@ function renderSummary(){
   let liveN = 0, upTo = 0;
   const rows = TRADE_K.map(T => {
     const base = {T, name:SUM_NAME[T.k] || T.name, gold:T.unit === "美元"};
-    if(T.self === true && !TX.ready) return {...base, wait:"台指資料載入中"};
+    if(T.self === true && !TVS.data) return {...base, wait:TVS.err || "TradingView 訊號載入中"};
     if(T.self === "hsi" && !PAN(T.pk).ready) return {...base, wait:"資料累積中"};
     if(!T.self && !LOGROWS.some(r => r.k === T.k)) return {...base, wait:"還沒有正式紀錄"};
     const R = tradesOf(T), C = costOf(T);
@@ -1377,7 +1385,7 @@ function renderTrades(){
   }
   const T = TRADE_K.find(x => x.k === tradeK) || TRADE_K[0], d = T.d || 0, u = T.unit;
   let html;
-  if(T.self === true && !TX.ready) html = `<div class="tnote">${TX.err || "台指資料載入中…"}</div>`;
+  if(T.self === true && !TVS.data) html = `<div class="tnote">${TVS.err || "TradingView 訊號載入中…"}</div>`;
   else if(T.self === "hsi" && !PAN(T.pk).ready) html = `<div class="tnote">${HSI.err || (HSI.bars.length ? `恆生資料累積中（已收到 ${HSI.bars.length} 根，暖機要約 3,340 根），收齊後就會開始算` : "還沒收到恆生資料：要在 TradingView 小型恆生期貨 30 秒圖掛「恆生傳送」並建警報")}</div>`;
   else if(!T.self && !LOGROWS) html = `<div class="tnote">${logErr || "讀取進出紀錄中…"}</div>`;
   else if(!T.self && !LOGROWS.some(r => r.k === T.k)) html = `<div class="tnote">這組還沒有正式紀錄（開工跑一次紀錄後才有）</div>`;
@@ -1391,7 +1399,7 @@ function renderTrades(){
       <div class="tot ${ud(tot)}">合計 ${sgn(tot)} ${u}（${sgn(totP, 2)}%）${o && o.pts == null ? '<small style="font-size:11px;font-weight:400;color:var(--mute)">　不含浮動</small>' : ""}</div>
       <div>已平倉 ${R.cnt} 筆（賺 ${R.win}／賠 ${R.cnt - R.win}），已實現 <span class="${ud(R.pts)}">${sgn(R.pts)} ${u}（${sgn(R.pct, 2)}%）</span></div>${winLine(T, R)}
       <div>${hold}</div></div>
-      <div class="tnote">${T.self === "hsi" ? `未扣手續費與滑價・點數是恆生指數點・從資料暖機完成那根起算（TradingView 警報開始送資料後約 70 分鐘補齊暖機）・資料延遲約 15 分鐘，到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新</div>` : T.self ? `未扣手續費・2026/10/06 起回算・期交所每日逐筆檔（每天 7:00 補夜盤、17:00 補日盤）＋TradingView 即時，資料到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新${TX.roll ? "・換月前的價格已照換月價差平移，盈虧點數不受影響" : ""}</div>` : `未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>`}` +
+      <div class="tnote">${T.self === "hsi" ? `未扣手續費與滑價・點數是恆生指數點・從資料暖機完成那根起算（TradingView 警報開始送資料後約 70 分鐘補齊暖機）・資料延遲約 15 分鐘，到 ${R.ready ? tText(R.upTo) : "—"}・開著會自動更新</div>` : T.self ? `未扣手續費・訊號來源 TradingView 848 版面（連續月），2026/10/06 起・訊號更新到 ${TVS.upd || "—"}</div>` : `未扣手續費・${R.ready ? "資料到 " + tText(R.upTo) + "・開著會自動更新" : "圖表還在載入，先顯示正式紀錄"}・◆＝正式紀錄之後網頁即時算的，下次開工以正式紀錄為準</div>`}` +
       (R.gap ? `<div class="tnote warn">正式紀錄最後一筆之後隔太久，網頁只能從 ${tText(R.first.t)} 接著算，中間可能漏掉交易；開工跑一次紀錄就會補齊。</div>` : "");
     const rowsH = R.trades.map((x, i) => ({x, i: i + 1})).reverse().map(({x, i}) => `<tr class="${x.live ? "live" : ""}">
       <td>${x.live ? "◆" : ""}${i}</td><td class="${sideCls(x.side)}">${SIDE_T[x.side]}</td>
@@ -1769,6 +1777,55 @@ const TX = {bars:{}, span:{}, base:{}, baseSpan:{}, ready:false, upd:"", err:"",
    近次月價差 150 點以上，接錯合約三格會立刻翻向——所以從最後交易日前一天夜盤 15:00 起，到盤後檔補到換倉點之後為止，
    台指三格只看盤後資料（txHoldLive），第二行會寫「換月中」。 */
 const TX_LIVE = "https://index-trend-tx.eason-237588.workers.dev/tx";
+/* v1.21.0 台指訊號一律以 TradingView 為準（使用者 2026-10-21 定）：台指 A/B、B2、B3、觀察二台指的持倉、明細、績效表
+   全部照 台指/tv_signals.json——848 版面四格策略（依合約變更調整＝連續月）的交易清單，網頁不再自己算台指訊號。
+   檔裡是「第一筆方向＋每次翻轉的時間與價格」，方向逐次對調；價格是 TradingView 平移後的價格，盈虧點數照它算。
+   格子上的 K 線仍是盤後檔＋即時 K，只是部位（線色、記號、持多／持空、進場點）改照 TradingView 的翻轉時間。 */
+const TVS = {data:null, upd:"", err:""}, TXK = {tx30:"TX1", tx37:"TX2", tx22:"TX3", o2tx:"TX4"};
+const tvTime = s => { const m = /(\d+)-(\d+)-(\d+) (\d+):(\d+)(?::(\d+))?/.exec(s); return Date.UTC(+m[1], m[2] - 1, +m[3], m[4] - 8, +m[5], +(m[6] || 0)); };
+const tvGroup = k => TVS.data && TVS.data.groups[k];
+const txNow = () => TX.live.length ? TX.live[TX.live.length-1][4] : null;   // TradingView 即時傳來的最新價
+async function loadTVS(){
+  const d = await jget("台指/tv_signals.json?t=" + Date.now());
+  if(d.upd === TVS.upd) return;
+  const groups = {};
+  for(const [k, G] of Object.entries(d.groups)){
+    let side = G.first;
+    groups[k] = {open:G.open, flips:G.flips.map(([t, p]) => { const f = {t:tvTime(t), p, side}; side = -side; return f; })};
+  }
+  TVS.data = {groups}; TVS.upd = d.upd; TVS.updT = tvTime(d.upd); TVS.err = "";
+  tradeSig = "";
+  PANELS.forEach(p => { if(p.src === "tx"){ if(p.R) tvOverride(p); p.dirty = true; } });
+}
+function tvOverride(p){            // 格子的部位改照 TradingView 翻轉時間（10/06 第一筆訊號之前當空手）
+  const G = tvGroup(TXK[p.k]), R = p.R; if(!G || !R) return;
+  const F = G.flips, B = p.bars; let j = -1;
+  for(let i = 0; i < R.pos.length; i++){
+    while(j + 1 < F.length && F[j+1].t <= B[i].t) j++;
+    R.pos[i] = j >= 0 ? F[j].side : 0;
+  }
+  R.all = [];
+  for(let i = 1; i < R.pos.length; i++) if(R.pos[i] !== R.pos[i-1]) R.all.push({i, d:R.pos[i]});
+  R.sigs = R.all.filter(s => s.i >= R.warm);
+}
+function tradesTV(T){
+  const G = tvGroup(T.k);
+  if(!G) return {cnt:0, win:0, pts:0, pct:0, op:null, trades:[], gap:false, ready:false, upTo:null, first:null};
+  const F = G.flips, trades = []; let pts = 0, pct = 0, cnt = 0, win = 0;
+  for(let i = 1; i < F.length; i++){
+    const a = F[i-1], b = F[i], g = (b.p - a.p) * a.side;
+    pts += g; pct += g / a.p * 100; cnt++; win += g > 0;
+    trades.push({side:a.side, et:a.t, ep:a.p, xt:b.t, xp:b.p, g, gp:g / a.p * 100, cum:pts, live:false});
+  }
+  const L = F[F.length-1]; let op = null;
+  if(G.open && L){
+    op = {side:L.side, t:L.t, p:L.p, live:false};
+    const now = txNow();
+    if(now != null){ const g = (now - L.p) * L.side; Object.assign(op, {now, pts:g, pct:g / L.p * 100}); }
+  }
+  const upTo = Math.max(TVS.updT || 0, TX.live.length ? TX.live[TX.live.length-1][0] * 1000 : 0);
+  return {cnt, win, pts, pct, op, trades, gap:false, ready:true, upTo, first:null};
+}
 function txOpen(t){   // 同 更新台指.py 的 tx_open（台北時間）
   const d = new Date(t + 8 * 3600000), wd = (d.getUTCDay() + 6) % 7, hm = d.getUTCHours() * 60 + d.getUTCMinutes();
   if(hm < 300) return wd >= 1 && wd <= 5;
@@ -1975,6 +2032,7 @@ async function main(){
       loadHL(PAN("atr1")).catch(e => { $("wait-atr1").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
       loadTX().catch(e => { TX.err = "台指資料載入失敗：" + e.message + "，請重新整理"; for(const k of ["tx30", "tx37", "tx22", "o2tx"]) $("wait-" + k).textContent = TX.err; }),
       pollTXL().catch(() => {}),
+      loadTVS().catch(e => { TVS.err = "TradingView 訊號檔讀取失敗：" + e.message + "，請重新整理"; tradeSig = ""; }),   // v1.21.0
       pollHSI().catch(e => { HSI.err = "恆生資料讀取失敗：" + e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }),   // v1.19.0   // 即時 K 拿不到時照舊只顯示盤後資料
       loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
@@ -1995,6 +2053,7 @@ async function main(){
   setInterval(gtrSave, 60000);
   setInterval(() => { loadDaily().catch(() => {}); }, 1800000);
   setInterval(() => { loadTX().catch(() => {}); }, 600000);   // 台指盤後資料：每 10 分鐘看總表有沒有更新
+  setInterval(() => { loadTVS().catch(() => {}); }, 300000);  // v1.21.0 TradingView 訊號檔：每 5 分鐘重讀
   setInterval(() => { pollHSI().catch(e => { HSI.pollErr = e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }); }, 30000);   // v1.19.0 恆生
   // v1.18.0：失敗時也重畫台指各格，資料一停警告才跳得出來
   setInterval(() => { pollTXL().catch(e => { TX.pollErr = e.message; PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; }); }); }, 10000);
