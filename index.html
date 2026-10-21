@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.23.0</title>
+<title>期貨趨勢 v1.23.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -175,7 +175,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.23.0";   // v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.23.1";   // v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1157,7 +1157,9 @@ function tradesOf(T){
   if(T.self){
     // 台指：起算那根（10/6 第一根、且已過暖機）的部位當「起算持有」，之後逐根照格子的部位接著算
     rows = [];
-    if(p.ready && p.R && p.done){
+    if(T.self === true && TXH[T.k]){   // v1.23.1 10/06 起的舊段（TradingView 歷史 30 秒 K 算好的）
+      rows = TXH[T.k].rows.map((r, i) => ({k:T.k, t:r.t, act:i ? "" : "起算持有", side:r.side, p:r.p, nq:null, note:""}));
+    }else if(p.ready && p.R && p.done){
       // v1.19.0 恆生（self:"hsi"）沒有固定起算日：從資料暖機完成那根開始
       const st = T.self === "hsi" ? 0 : TX_START, s = p.bars.findIndex((b, i) => i >= p.R.warm && b.t >= st);
       if(s >= 0) rows.push({k:T.k, t:p.bars[s].t, act:"起算持有", side:p.R.pos[s], p:p.bars[s].c, nq:null, note:""});
@@ -1178,7 +1180,7 @@ function tradesOf(T){
   let gap = false;
   if(ready && rows.length){
     const B = p.bars, pos = p.R.pos, n = p.done, lo = p.R.warm;
-    const from = Math.max(rows[rows.length-1].t, T.self ? 0 : LOGCOVER[T.k] || 0);
+    const from = Math.max(rows[rows.length-1].t, T.self ? (T.self === true && TXH[T.k] ? TXH[T.k].cut : 0) : LOGCOVER[T.k] || 0);
     let cur = rows[rows.length-1].side, s = B.findIndex(b => b.t > from);
     if(s < 0 || s > n) s = n;
     if(s < lo){ gap = true; s = lo; }   // 正式紀錄之後的缺口比網頁抓到的資料還長，中間可能漏
@@ -1793,6 +1795,18 @@ async function loadTVS(){
   tradeSig = "";
   PANELS.forEach(p => { if(p.src === "tx"){ if(p.R) tvOverride(p); p.dirty = true; } });
 }
+/* v1.23.1 台指 10/06 起的舊段（使用者 10/21「補 10/06 起的資料」）：TradingView 1 秒 K 只留兩三天，
+   所以 A/B、觀察二兩組 10/06 起到 cut 的部分，另外從 TradingView 大台 30 秒連續月歷史 K，用網頁同一套 calcRF、
+   同一組參數算好存成 台指/tv_hist.json（{groups:{TX1:{cut, rows:[[時間, 方向, 價格], …]}}}，第一列＝起算持有）。
+   cut 之後照常用即時資料接著算（接點部位不同記「校正」）。B2、B3 使用者選不補，從 10/20 起算。 */
+const TXH = {};
+async function loadTXH(){
+  const r = await fetch("台指/tv_hist.json?t=" + Date.now(), {cache:"no-store"});
+  if(!r.ok) return;
+  const d = await r.json();
+  for(const [k, G] of Object.entries(d.groups || {})) TXH[k] = {cut:tvTime(G.cut), rows:G.rows.map(([t, side, p]) => ({t:tvTime(t), side, p}))};
+  tradeSig = "";
+}
 function tvOverride(p){            // 格子的部位改照 TradingView 翻轉時間（10/06 第一筆訊號之前當空手）
   const G = tvGroup(TXK[p.k]), R = p.R; if(!G || !R) return;
   const F = G.flips, B = p.bars; let j = -1;
@@ -2065,6 +2079,7 @@ async function main(){
       // C 格 v1.10.0 刪除；Hyperliquid 仍要抓：H 格與交易明細的那斯達克換算要用
       loadHL(PAN("atr1")).catch(e => { $("wait-atr1").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
       pollTXL().catch(() => {}),
+      loadTXH().catch(() => {}),   // v1.23.1 台指 10/06 起的舊段（沒有檔就略過）
       pollHSI().catch(e => { HSI.err = "恆生資料讀取失敗：" + e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }),   // v1.19.0   // 即時 K 拿不到時照舊只顯示盤後資料
       loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
