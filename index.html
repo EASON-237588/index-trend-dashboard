@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.19.1</title>
+<title>期貨趨勢 v1.20.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -137,6 +137,15 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 .tt small{color:var(--mute);font-size:10.5px}
 .tt tr.live td:first-child{color:var(--tag)}
 .tt tr.hold td{background:rgba(34,199,232,.07)}
+/* v1.20.0 績效表（使用者 2026-10-21 要求）：手機欄位放不下，整張表可左右滑；組別、備註兩欄允許換行 */
+.stw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:6px}
+.st th:first-child,.st td:first-child{text-align:left;white-space:normal;min-width:118px}
+.st td.nt{text-align:left;white-space:normal;min-width:150px}
+.st th:last-child{text-align:left}
+.st tr.pass td{background:rgba(255,212,0,.08)}
+.st tr.pass td.nt{color:#ffd400;font-weight:700}
+.st tr.wait td{color:var(--mute)}
+.st .sec td{color:var(--mute);text-align:left;padding-top:8px;border-bottom:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -165,7 +174,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.19.1";   // v1.19.1：觀察二四格名稱與交易明細四組閃爍（使用者 2026-10-18 要求）
+const VERSION = "v1.20.0";   // v1.20.0：交易明細加「績效表」分頁（使用者 2026-10-21 要求，平日隨時在手機看）
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -964,7 +973,8 @@ function buildDOM(){
       <div class="wait" id="wait-${p.k}">${p.waitMsg || "載入中…"}</div>
     </div>
   </section>`).join("");
-  $("tradeTabs").innerHTML = TRADE_K.map(T => `<button data-k="${T.k}"${T.blink?" data-blink":""}>${T.name}</button>`).join("");
+  $("tradeTabs").innerHTML = `<button data-k="SUM">績效表</button>` +   // v1.20.0
+    TRADE_K.map(T => `<button data-k="${T.k}"${T.blink?" data-blink":""}>${T.name}</button>`).join("");
   $("tradeTabs").onclick = e => {
     const k = e.target.dataset && e.target.dataset.k; if(!k) return;
     tradeK = k; try{ localStorage.setItem("itd-trade-k", k); }catch(err){}
@@ -1291,8 +1301,79 @@ function specBar(T){
   if(!sp) return "";
   return `<div class="spec"><span><i>週期</i>${sp.tf}</span><span><i>策略參數</i>${sp.par}</span><span><i>資料源</i>${sp.src}</span></div>`;
 }
+/* v1.20.0 績效表（使用者 2026-10-21 要求「這張表平日要隨時看得到」，格式照他給的開工績效表）：
+   - 合計＝只算已平倉（不含持有中浮動，和各組頁面含浮動的「合計」不同）；那斯達克、台指用 costOf 扣成本換台幣，
+     黃金是美元／盎司，恆生沒有成本規則→點數。賺／賠、勝率照 tradesOf 的 win（點數 > 0 算賺）。
+   - 獲利因子＝扣成本後賺的合計÷賠的合計。台幣組（那斯達克、台指、恆生）依合計排名，黃金只在黃金內排名。
+   - 篩選：已平倉 ≥ 20、獲利因子 ≥ 1.5、合計 > 0 三項都過才通過；篩選名次依獲利因子由高到低；未滿 1.55 加註。
+   - 開工回報用的 skills/index-trend-ops/scripts/daily_table.js 是同一套規則，改這裡要兩邊一起改。 */
+const SUM_NAME = {
+  A:"那斯達克・A（30 秒）", G:"那斯達克・B（30 秒）", G2:"那斯達克・B2（37 秒）", G3:"那斯達克・B3（22 秒）",
+  C:"那斯達克・D（6 分）", C2:"那斯達克・D2（6 分）", D:"黃金・E（8 分）", E:"黃金・F（11 分）",
+  TX1:"台指・A/B", TX2:"台指・B2", TX3:"台指・B3", TX4:"台指・觀察二 台指",
+  O1:"那斯達克・觀察二 555/23", O2:"那斯達克・觀察二 37/37", HSI:"恆生・觀察二 恆生",
+  R30:"那斯達克・G（30 秒，Gate）", R1:"那斯達克・H（1 分）", R2:"那斯達克・I（2 分）",
+};
+const SUM_MIN_N = 20, SUM_MIN_PF = 1.5;
+function renderSummary(){
+  if(!LOGROWS) return `<div class="tnote">${logErr || "讀取進出紀錄中…"}</div>`;
+  let liveN = 0, upTo = 0;
+  const rows = TRADE_K.map(T => {
+    const base = {T, name:SUM_NAME[T.k] || T.name, gold:T.unit === "美元"};
+    if(T.self === true && !TX.ready) return {...base, wait:"台指資料載入中"};
+    if(T.self === "hsi" && !PAN(T.pk).ready) return {...base, wait:"資料累積中"};
+    if(!T.self && !LOGROWS.some(r => r.k === T.k)) return {...base, wait:"還沒有正式紀錄"};
+    const R = tradesOf(T), C = costOf(T);
+    const nets = R.trades.map(x => C ? C.nt(x.g, x.ep, x.xp) : x.g);
+    const pos = nets.filter(v => v > 0).reduce((a, b) => a + b, 0), neg = -nets.filter(v => v < 0).reduce((a, b) => a + b, 0);
+    liveN += R.trades.filter(x => x.live).length;
+    if(R.upTo && R.upTo > upTo) upTo = R.upTo;
+    return {...base, twd:!!C, cnt:R.cnt, win:R.win, sum:pos - neg,
+      pf:!R.cnt ? null : neg ? pos / neg : pos ? Infinity : 0, rate:R.cnt ? R.win / R.cnt * 100 : null};
+  });
+  const pass = r => !r.wait && r.cnt >= SUM_MIN_N && r.pf >= SUM_MIN_PF && r.sum > 0;
+  const byOrder = list => {
+    const ok = list.filter(r => !r.wait).sort((a, b) => b.sum - a.sum);
+    const scr = ok.filter(pass).sort((a, b) => b.pf - a.pf);
+    return {ok, scr, wait:list.filter(r => r.wait)};
+  };
+  const twd = byOrder(rows.filter(r => !r.gold)), gold = byOrder(rows.filter(r => r.gold));
+  const note = r => {
+    if(!r.cnt) return "未通過：尚無已平倉" + (r.T.self === "hsi" ? "，資料還在累積" : "");
+    if(pass(r)) return r.pf < SUM_MIN_PF + 0.05 ? "通過（只比門檻高一點）" : "通過";
+    const why = [];
+    if(r.cnt < SUM_MIN_N) why.push(`已平倉不足 ${SUM_MIN_N} 筆`);
+    if(r.sum <= 0) why.push("合計為負"); else if(r.pf < SUM_MIN_PF) why.push(`獲利因子不足 ${SUM_MIN_PF}`);
+    return "未通過：" + why.join("，");
+  };
+  const money = r => { const s = sgn(r.sum); return r.gold ? s + " 美元" : r.twd || !r.cnt ? s : s + " 點"; };
+  const pfT = r => r.pf == null ? "—" : r.pf === Infinity ? "∞" : r.pf === 0 ? "0（無獲利）" : r.pf.toFixed(3);
+  const rateT = r => r.rate == null ? "—" : r.rate === 0 ? "0%" : r.rate.toFixed(1) + "%";
+  const tr = (r, i, g, isGold) => {
+    const s = g.scr.indexOf(r), pre = isGold ? "黃金內 " : "";
+    return `<tr class="${pass(r) ? "pass" : ""}"><td>${r.name}</td><td>${r.cnt ? `${r.cnt}（${r.win}／${r.cnt - r.win}）` : "0"}</td>
+      <td class="${ud(Math.round(r.sum))}">${money(r)}</td><td>${pfT(r)}</td><td>${rateT(r)}</td>
+      <td>${pre}${i + 1}</td><td>${s < 0 ? "—" : pre + (s + 1)}</td><td class="nt">${note(r)}</td></tr>`;
+  };
+  const trW = r => `<tr class="wait"><td>${r.name}</td><td colspan="6">${r.wait}</td><td class="nt">—</td></tr>`;
+  const sec = t => `<tr class="sec"><td colspan="8">${t}</td></tr>`;
+  const body = sec("台幣組（那斯達克、台指、恆生）依合計排名") + twd.ok.map((r, i) => tr(r, i, twd, false)).join("") + twd.wait.map(trW).join("") +
+    sec("黃金只在黃金內排名") + gold.ok.map((r, i) => tr(r, i, gold, true)).join("") + gold.wait.map(trW).join("");
+  return `<div class="tsum"><div class="tot" style="font-size:18px">績效表</div>
+      <div>通過篩選：台幣組 ${twd.scr.length} 組${gold.scr.length ? `、黃金 ${gold.scr.length} 組` : ""}（已平倉 ≥ ${SUM_MIN_N} 筆、獲利因子 ≥ ${SUM_MIN_PF}、合計 > 0）</div></div>
+    <div class="stw"><table class="tt st"><thead><tr><th>組別</th><th>已平倉（賺／賠）</th><th>合計</th><th>獲利因子</th><th>勝率</th><th>獲利名次</th><th>篩選名次</th><th>備註</th></tr></thead>
+      <tbody>${body}</tbody></table></div>
+    <div class="tnote">合計只算已平倉，不含持有中浮動（各組頁面的「合計」有含浮動，兩者不同）・那斯達克：微型 1 口、單邊手續費 ${MNQ.fee} 美元、匯率 ${MNQ.rate.toFixed(2)}・台指：微台 1 口、單邊手續費 ${TMF.fee} 元＋期交稅・黃金：美元／盎司、未扣成本・恆生：點數、未扣成本（手續費與匯率在各組頁面改）<br>
+      獲利因子＝扣成本後賺的合計÷賠的合計・勝率＝賺的筆數÷已平倉（點數大於 0 算賺）・資料到 ${upTo ? tText(upTo) : "—"}・開著會自動更新${liveN ? `・含 ${liveN} 筆◆網頁即時算的交易，下次開工以正式紀錄為準` : ""}</div>`;
+}
 function renderTrades(){
   if($("tradeSheet").hidden) return;
+  if(tradeK === "SUM"){   // v1.20.0 績效表
+    const html = renderSummary();
+    document.querySelectorAll("#tradeTabs button").forEach(b => b.classList.toggle("on", b.dataset.k === "SUM"));
+    if(html !== tradeSig){ tradeSig = html; $("tradeBody").innerHTML = html; }
+    return;
+  }
   const T = TRADE_K.find(x => x.k === tradeK) || TRADE_K[0], d = T.d || 0, u = T.unit;
   let html;
   if(T.self === true && !TX.ready) html = `<div class="tnote">${TX.err || "台指資料載入中…"}</div>`;
