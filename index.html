@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.20.0</title>
+<title>期貨趨勢 v1.20.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -152,8 +152,9 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 <div class="app">
 <header>
   <h1>期貨趨勢<small id="ver"></small></h1>
-  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="tx">台指</button><button data-pg="long">中長趨勢</button><button data-pg="obs">觀察</button><button data-pg="obs2">觀察二</button></div>
-  <button class="hbtn" id="tradeBtn">交易明細</button>
+  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="tx">台指</button><button data-pg="long">趨勢</button><button data-pg="obs">觀察</button><button data-pg="obs2">觀察二</button></div>
+  <!-- v1.20.1 使用者 2026-10-21 要求標題列文字縮短：中長趨勢→趨勢、交易明細→明細（面板內標籤與明細視窗標題不變） -->
+  <button class="hbtn" id="tradeBtn">明細</button>
   <div class="status"><i class="dot" id="dot"></i><span id="stTxt">準備中</span></div>
 </header>
 <div class="loadbar" id="loadBar" hidden><div class="fill" id="loadFill"></div><span id="loadTxt"></span></div>
@@ -174,7 +175,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.20.0";   // v1.20.0：交易明細加「績效表」分頁（使用者 2026-10-21 要求，平日隨時在手機看）
+const VERSION = "v1.20.1";   // v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
