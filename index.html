@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.23.1</title>
+<title>期貨趨勢 v1.23.2</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -175,7 +175,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.23.1";   // v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.23.2";   // v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1765,7 +1765,7 @@ function gtrSave(){
    （in − out）（往回調整）讓趨勢線連續——近次月價差有 150 點以上，不平移的話換月那一刻一定翻向；
    交易明細則真的拆成兩筆、記「換倉」，多算一次來回成本。萬一換月那天的檔漏掉，退回用日界的次月價差平移。 */
 const TX = {bars:{}, span:{}, base:{}, baseSpan:{}, ready:false, upd:"", err:"", roll:false, rolls:{}, rollRows:[],
-            hold:false, lastC:"", upTo:0, live:[], liveN:{}, liveAt:0, pollOk:Date.now(), pollErr:""}, TX_START = Date.UTC(2026, 9, 5, 16);   // 台北 10/06 00:00
+            hold:false, lastC:"", upTo:0, live:[], liveN:{}, liveAt:0, pollOk:Date.now(), pollErr:""}, TX_START = Date.UTC(2026, 9, 20, 16);   // 台北 10/21 00:00（v1.23.2 使用者 10/21：「依今天的訊號進來，重新做紀錄，重新做觀察」，之前的不補）
 /* v1.12.0 台指即時：TradingView 台指期 1 秒圖掛「台指即時傳送」腳本，警報每約 15 秒把 1 秒 K 送到轉接站 index-trend-tx
    （worker-tx\，只留 3 天）。這裡每 10 秒拿盤後檔最後一根之後的 1 秒 K，照 更新台指.py 的 bars() 同一套切法合成
    30／37／22 秒 K 接在盤後資料後面：以 1970 起整數秒切桶、只算交易時段、同一段開盤內 2 小時內沒成交補平盤 K。
