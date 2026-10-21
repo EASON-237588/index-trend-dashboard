@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.20.3</title>
+<title>期貨趨勢 v1.20.4</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -175,7 +175,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.20.3";   // v1.20.3：台指換月窗改即時優先（TX_HOLD_ROLL＝false，換月日也接即時 K）；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.20.4";   // v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1796,7 +1796,7 @@ function txRollAt(ym){            // 該月最後交易日＝第三個星期三�
   const day = 1 + (3 - w + 7) % 7 + 14;
   return {rt: Date.UTC(y, m, day, 5, 25), start: Date.UTC(y, m, day - 1, 7, 0)};   // 台北 13:25／前一天 15:00
 }
-const TX_HOLD_ROLL = false;      // v1.20.3 改即時優先：false＝換月窗內也接即時 K（使用者 2026-10-21 決定）；改回 true 就恢復只看盤後
+const TX_HOLD_ROLL = true;       // v1.20.4 換月窗恢復只看盤後（2026-10-21 改回）：TradingView 換到次月合約的時間不確定，換約窗內接即時 K 會接錯合約；false＝即時優先
 function txHoldLive(){            // 換月窗內（盤後檔還沒補到換倉點）不接即時 K
   if(!TX_HOLD_ROLL || !TX.lastC) return false;
   const r = txRollAt(TX.lastC);
