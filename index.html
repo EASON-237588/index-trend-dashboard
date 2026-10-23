@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.24.0</title>
+<title>期貨趨勢 v1.25.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -36,6 +36,12 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 .tabs button+button{border-left:1px solid var(--line)}
 .tabs button.on{color:#0b0e14;background:var(--tag);font-weight:700}
 /* v1.4.1 多了「曲線圖」按鈕，手機寬度下標題列會超出 53px、「說明」被擠出畫面：窄螢幕縮間距與內距 */
+/* v1.25.0 多了「自動」排版鈕，560 寬以下標題列會超出：間距與內距再縮 */
+@media (max-width:560px){
+  header{gap:4px}
+  .tabs button{padding:3px 6px}
+  header .hbtn{padding:3px 6px}
+}
 @media (max-width:440px){
   header{gap:3px;padding-left:4px;padding-right:4px}
   h1{letter-spacing:0}
@@ -82,6 +88,8 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 .badge{font-size:12px;font-weight:700;border-radius:4px;padding:1px 8px;background:#2a2f3d;color:var(--mute)}
 .badge.long{background:rgba(255,59,59,.16);color:var(--long)}
 .badge.short{background:rgba(76,255,0,.12);color:var(--short)}
+/* v1.25.3 持多／持空後面放浮動績效總數字（使用者 2026-10-23 要求） */
+.badge .tot{margin-left:6px;font-size:12px;font-weight:700}
 .px{margin-left:auto;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
 .px small{font-size:12px;font-weight:400;margin-left:6px}
 .kv{flex:none;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mute);margin:2px 0 4px;white-space:nowrap;
@@ -137,8 +145,9 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 .tnote{font-size:11px;color:var(--mute);line-height:1.5;margin:2px 0 6px}
 .tnote.warn{color:var(--warn)}
 .tt{width:100%;border-collapse:collapse;font-size:11.5px;line-height:1.35;color:var(--text);font-variant-numeric:tabular-nums}
-.tt th{font-weight:400;color:var(--mute);text-align:right;padding:3px;border-bottom:1px solid var(--line);white-space:nowrap}
-.tt td{text-align:right;padding:4px 3px;border-bottom:1px solid #1b2130;white-space:nowrap;vertical-align:top}
+/* v1.25.1 表格線改螢光藍（使用者 2026-10-23 要求）：表頭底線、每列底線、績效表分節線都用 #00E5FF */
+.tt th{font-weight:400;color:var(--mute);text-align:right;padding:3px;border-bottom:1px solid #00e5ff;white-space:nowrap}
+.tt td{text-align:right;padding:4px 3px;border-bottom:1px solid #00e5ff;white-space:nowrap;vertical-align:top}
 .tt th:nth-child(-n+2),.tt td:nth-child(-n+2){text-align:center}
 .tt small{color:var(--mute);font-size:10.5px}
 .tt tr.live td:first-child{color:var(--tag)}
@@ -151,7 +160,15 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 .st tr.pass td{background:rgba(255,212,0,.08)}
 .st tr.pass td.nt{color:#ffd400;font-weight:700}
 .st tr.wait td{color:var(--mute)}
-.st .sec td{color:var(--mute);text-align:left;padding-top:8px;border-bottom:1px solid var(--line)}
+.st .sec td{color:var(--mute);text-align:left;padding-top:8px;border-bottom:1px solid #00e5ff}
+/* v1.25.0 電腦版排版（使用者 2026-10-23 決定：手機版與電腦版同一份程式，依螢幕寬度自動切，也可手動選）。
+   電腦版＝這一頁的格子並排、自動換行，可上下捲動；規則、資料、交易明細完全不動。 */
+.lay-w .app{max-width:none}
+/* 電腦版：指定的 9 格同一頁、不捲動、不翻頁，三欄三列，每格一樣大；分頁列隱藏 */
+.lay-w #tabs{display:none}
+.lay-w .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;padding:0 8px 8px;overflow:hidden}
+.lay-w .panel{flex:none;height:auto;min-height:0}
+.lay-w .grid.mx{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
 </style>
 </head>
 <body>
@@ -161,6 +178,8 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
   <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="tx">台指</button><button data-pg="long">趨勢</button><button data-pg="obs">觀察</button><button data-pg="obs2">觀察二</button></div>
   <!-- v1.20.1 使用者 2026-10-21 要求標題列文字縮短：中長趨勢→趨勢、交易明細→明細（面板內標籤與明細視窗標題不變） -->
   <button class="hbtn" id="tradeBtn">明細</button>
+  <!-- v1.25.0：排版切換，自動＝螢幕寬 900px 以上用電腦版；選擇只存在這台瀏覽器 -->
+  <button class="hbtn" id="layBtn">自動</button>
   <div class="status"><i class="dot" id="dot"></i><span id="stTxt">準備中</span></div>
 </header>
 <div class="loadbar" id="loadBar" hidden><div class="fill" id="loadFill"></div><span id="loadTxt"></span></div>
@@ -181,7 +200,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.24.0";   // v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.25.0";   // v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1007,12 +1026,19 @@ function buildDOM(){
   $("tradeSheet").onclick = e => { if(e.target.id === "tradeSheet") $("tradeSheet").hidden = true; };
   for(const p of PANELS) bindChart(p);
   document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => showPage(b.dataset.pg));
+  $("layBtn").onclick = () => { try{ localStorage.setItem(LAY_KEY, LAY_NEXT[layMode()]); }catch(e){} applyLayout(); showPage(CURPG); };
+  applyLayout();
   let pg = "short"; try{ pg = localStorage.getItem(PAGE_KEY) || "short"; }catch(e){}
   showPage(pg);
   document.querySelectorAll(".zoom button").forEach(b => b.onclick = () => {
     const p = PAN(b.dataset.k), z = b.dataset.z;
     if(z === "max"){ setMax(MAXK === p.k ? null : p.k); return; }
-    if(z === "reset"){ p.view = {span:p.span, off:0}; p.userZoom = false; }
+    if(z === "reset"){
+      for(const q of PANELS) if(q === p || (SYNC_GROUP[p.k] && SYNC_GROUP[q.k] === SYNC_GROUP[p.k])){
+        q.view = {span:q.span, off:0}; q.userZoom = false;
+        if(q !== p && !$("p-" + q.k).hidden) draw(q);
+      }
+    }
     else zoomAt(p, z === "in" ? 0.7 : 1/0.7, 1);
     draw(p);
   });
@@ -1030,6 +1056,22 @@ function entryOf(p){
   return {side};
 }
 
+/* 持多／持空後面的浮動績效總數字：已平倉＋持有中浮動，算法跟績效表相同（台幣扣成本、黃金美元、恆生點數） */
+let totLogTry = 0;
+function totalHtml(p){
+  const T = TRADE_K.find(x => x.pk === p.k);
+  if(!T) return "";
+  // 那斯達克、黃金的已平倉要讀正式紀錄；紀錄只在打開「明細」時才會讀，這裡沒開明細也要自己讀，每分鐘最多試一次
+  if(!LOGROWS && Date.now() - totLogTry > 60000){ totLogTry = Date.now(); loadLog(); }
+  try{
+    const R = tradesOf(T), C = costOf(T);
+    const closed = R.trades.reduce((a, x) => a + (C ? C.nt(x.g, x.ep, x.xp) : x.g), 0);
+    const op = R.op, fl = op && op.now != null ? (C ? C.nt(op.pts, op.p, op.now) : op.pts) : 0;
+    const sum = closed + fl;
+    const txt = C ? ntFmt(sum) : sgn(sum, T.d || 0) + (T.unit === "美元" ? " 美元" : " 點");
+    return ` <span class="tot ${ud(Math.round(sum))}">${txt}</span>`;
+  }catch(e){ return ""; }
+}
 function renderInfo(p){
   if(!p.ready) return;
   const R = p.R, B = p.bars, last = B[B.length-1];
@@ -1039,6 +1081,7 @@ function renderInfo(p){
   const flatCls = p.flatCol === COL[1] ? "long" : p.flatCol ? "short" : "";
   badge.className = "badge " + (e.side > 0 ? "long" : e.side < 0 ? "short" : flatCls);
   badge.textContent = e.side > 0 ? "持多" : e.side < 0 ? "持空" : "空手";
+  badge.innerHTML += totalHtml(p);
 
   // 浮動點數：那斯達克兩格用換算後的那斯達克點數（跟交易明細一樣），換算比例還沒出來就先不顯示
   let flt = "";
@@ -1435,14 +1478,35 @@ function setMax(k){
   showPage(CURPG);
 }
 document.addEventListener("keydown", e => { if(e.key === "Escape" && MAXK) setMax(null); });
+/* v1.25.0 排版：手機版（分頁單欄）或電腦版（15 格同一頁）。自動＝螢幕寬 1280px 以上用電腦版；手動選的存在這台瀏覽器。 */
+const LAY_KEY = "itd-layout", LAY_NEXT = {auto:"m", m:"w", w:"auto"}, LAY_TXT = {auto:"自動", m:"手機", w:"電腦"};
+/* 電腦版保留的 9 格與位置（列, 欄）：第 1 列 A、B2、那斯達克觀察二 555/23；第 2 列 D2、台指 B2、台指觀察二；第 3 列 黃金 F、黃金 E、恆生觀察二 */
+const BOARD_AT = {rf:[1,1], gate2:[1,2], o2nq:[1,3], nq6b:[2,1], tx37:[2,2], o2tx:[2,3], gold11:[3,1], gold8:[3,2], o2hsi:[3,3]};
+function layMode(){ try{ return localStorage.getItem(LAY_KEY) || "auto"; }catch(e){ return "auto"; } }
+function applyLayout(){
+  const mode = layMode(), wide = mode === "w" || (mode === "auto" && window.innerWidth >= 1280);
+  document.body.classList.toggle("lay-w", wide);
+  $("layBtn").textContent = LAY_TXT[mode];
+  $("layBtn").title = "排版：" + LAY_TXT[mode] + "（點一下切換：自動→手機→電腦）";
+}
 function showPage(pg){
   if(!PANELS.some(p => p.pg === pg)) pg = "short";
   if(MAXK && PAN(MAXK).pg !== pg){ MAXK = null; for(const p of PANELS){ const b = $("mx-" + p.k); b.textContent = "⤢"; b.title = "這一格放到最大"; } }
   CURPG = pg;
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.pg === pg));
-  for(const p of PANELS) $("p-" + p.k).hidden = p.pg !== pg || (MAXK !== null && p.k !== MAXK);
+  /* 電腦版：不分頁，所有策略（觀察 G／H／I 除外）同時顯示；手機版照分頁。單格放大時只留那一格。 */
+  const wide = document.body.classList.contains("lay-w");
+  for(const p of PANELS){
+    const el = $("p-" + p.k), at = wide ? BOARD_AT[p.k] : null;
+    const onPage = wide ? !!at : p.pg === pg;
+    el.hidden = !onPage || (MAXK !== null && p.k !== MAXK);
+    /* 電腦版：每格指定位置；單格放大時那一格改放在唯一的格子裡 */
+    el.style.gridRow = at ? (MAXK !== null ? "1" : String(at[0])) : "";
+    el.style.gridColumn = at ? (MAXK !== null ? "1" : String(at[1])) : "";
+  }
+  $("grid").classList.toggle("mx", MAXK !== null);
   try{ localStorage.setItem(PAGE_KEY, pg); }catch(e){}
-  for(const p of PANELS) if(p.pg === pg) draw(p);
+  for(const p of PANELS) if(!$("p-" + p.k).hidden) draw(p);
 }
 function setupCanvas(cv){
   const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
@@ -1599,6 +1663,27 @@ function setHoverT(t){
   if(!hoverRaf) hoverRaf = requestAnimationFrame(() => { hoverRaf = 0; PANELS.forEach(draw); });
 }
 
+/* 同步顯示範圍（使用者 2026-10-23 要求）：那斯達克、台指、恆生各自一組，組內任一格縮放或拖曳，其他格顯示同一段時間。黃金不同步。
+   只在使用者動過圖之後才同步；格子的 K 棒週期不同（30 秒、37 秒、6 分…），所以用時間對齊、不用根數。 */
+const SYNC_GROUP = {};
+for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","nq6","nq6b","o2nq","o2nq37"], tx:["tx30","tx37","tx22","o2tx"], hsi:["o2hsi"]}))
+  for(const k of keys) SYNC_GROUP[k] = g;
+function syncView(p){
+  const g = SYNC_GROUP[p.k];
+  if(!g || !p.ready || !p.bars.length) return;
+  const {i0, i1} = viewRange(p), t0 = p.bars[i0].t, t1 = p.bars[i1].t;
+  for(const q of PANELS){
+    if(q === p || SYNC_GROUP[q.k] !== g || !q.ready || !q.bars.length) continue;
+    const j1 = idxAtTime(q, t1);
+    if(j1 == null) continue;   // 這格的資料還沒到這段時間
+    const j0 = idxAtTime(q, t0) || 0;
+    q.userZoom = true;
+    q.view.span = Math.max(30, j1 - j0 + 1);
+    q.view.off = q.bars.length - 1 - j1;
+    if(!$("p-" + q.k).hidden) draw(q);
+  }
+}
+
 // 以畫面某個位置為錨點縮放（anchor01：0＝最左、1＝最右）
 function zoomAt(p, f, anchor01){
   p.userZoom = true;   // 使用者自己縮放過，就不再自動對齊時間範圍
@@ -1608,6 +1693,7 @@ function zoomAt(p, f, anchor01){
   const ni0 = idx - anchor01 * ns;
   p.view.span = ns;
   p.view.off = Math.max(0, Math.min(n - ns, Math.round(n - (ni0 + ns))));
+  syncView(p);
 }
 function bindChart(p){
   const cv = $("cv-" + p.k);
@@ -1623,6 +1709,7 @@ function bindChart(p){
     if(drag){
       const r = cv.getBoundingClientRect(), bw = (r.width - (p.padR || PADR)) / p.view.span;
       p.view.off = Math.max(0, Math.round(drag.off + (e.clientX - drag.x) / bw));
+      syncView(p);
     }
     setHoverT(p.bars[idxAt(e.clientX)].t);
   });
@@ -2155,7 +2242,7 @@ setInterval(() => {
 }, 1000);
 // 30 秒線即使沒有新成交，時間到了那根也要收盤
 setInterval(() => { if(S30.ready) dirty30(); }, 5000);
-window.addEventListener("resize", () => PANELS.forEach(draw));
+window.addEventListener("resize", () => { applyLayout(); showPage(CURPG); });
 window.addEventListener("pagehide", save30);
 window.APP = {PANELS, S30, RAW1M, get RATIO(){ return RATIO; }};
 main();
