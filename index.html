@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.23.6</title>
+<title>期貨趨勢 v1.23.7</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -89,6 +89,7 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 .kv .kvt{min-width:0;overflow:hidden;text-overflow:ellipsis}
 /* v1.18.0 即時資料中斷警告：放在第二行最前面、不會被截掉；只用底色，不加光暈 */
 .feedw{flex:none;margin-right:6px;background:#c62828;color:#fff;border-radius:4px;padding:0 6px;font-size:12px;font-weight:700;line-height:17px}
+.feedh{flex:none;margin-right:6px;background:#5f6368;color:#fff;border-radius:4px;padding:0 6px;font-size:12px;font-weight:700;line-height:17px}
 .feedg{flex:none;margin-right:6px;color:var(--warn);font-size:12px;font-weight:700;line-height:17px}
 .kv b{font-weight:400;color:var(--text)}
 /* v1.8.2：持有中的浮動點數放第二行最右邊，白底；賺紅字、虧綠字，不放百分比（使用者 2026-10-13 要求）。
@@ -180,7 +181,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.23.6";   // v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.23.7";   // v1.23.7：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1089,7 +1090,7 @@ function renderInfo(p){
   let fw = "";   // v1.18.0 即時資料中斷／漏資料警告
   if(p.src === "tx" || p.src === "hsi"){
     const f = p.src === "tx" ? txFeed() : hsiFeed(), g = p.src === "tx" ? txGaps() : hsiGaps();
-    if(f) fw = `<span class="feedw" title="${f.long}">${f.short}</span>`;
+    if(f) fw = `<span class="${f.gray ? "feedh" : "feedw"}" title="${f.long}">${f.short}</span>`;
     if(g.n) fw += `<span class="feedg" title="盤後檔還沒補到的時段裡，即時 1 秒 K 有 ${g.n} 段缺超過 1 分鐘（共約 ${g.min} 分鐘）；盤後檔補上後就會被正本補齊">漏 ${g.n} 段</span>`;
   }
   $("kv-" + p.k).innerHTML = fw + `<span class="kvt">${parts.join(" · ")}</span>` + flt;
@@ -1932,9 +1933,23 @@ function txSessStart(now){        // 這段開盤從幾點開始（每分鐘往�
   for(let i = 0; i < 1500 && txOpen(s - 60000); i++) s -= 60000;
   return s;
 }
+/* v1.23.7 休市（使用者 2026-10-23 要求）：10/23 台指休市，15:00 一到網頁以為夜盤開了，四格整晚亮紅色「即時中斷」。
+   txOpen 只看時刻、不知道假日，所以改看資料：這段交易時段一根 1 秒 K 都沒有（夜盤還要當天日盤也一根都沒有）
+   就當休市，改成灰色「今日休市？」。中途才停的照舊紅字；警報從開盤前就停的話也會被判成休市，所以提示裡要寫清楚。 */
+function txHoliday(now){
+  const has = (a, b) => { for(let i = TX.live.length - 1; i >= 0; i--){ const t = TX.live[i][0] * 1000; if(t < a) return false; if(t < b) return true; } return false; };
+  if(has(txSessStart(now), now)) return false;
+  const d = new Date(now + 8 * 3600000), hm = d.getUTCHours() * 60 + d.getUTCMinutes();
+  if(hm >= 525 && hm < 825) return true;                 // 日盤到現在一根都沒有
+  let day = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - 8 * 3600000;   // 台北當天 00:00
+  if(hm < 300) day -= 86400000;                          // 凌晨的夜盤屬於前一天
+  return !has(day + 525 * 60000, day + 825 * 60000);     // 夜盤：當天日盤 08:45～13:45 也一根都沒有
+}
+const TX_HOLIDAY = {short:"今日休市？", gray:true, long:"這段交易時段一筆台指資料都沒有（夜盤連當天日盤也沒有），應該是休市；若今天不是假日，請到 TradingView 確認「台指即時傳送」警報"};
 function txFeed(){
   const now = Date.now();
   if(!txOpen(now)) return null;
+  if(!TX.useTW || TX.src !== "tw"){ if(now - TX.pollOk <= 120000 && txHoliday(now)) return TX_HOLIDAY; }
   if(TX.useTW && TX.src === "tw"){   // v1.22.0 改看 TradingView 連續月 30 秒 K（用 1 秒 K 時照下面舊的判斷）
     const last = TW.bars[TW.bars.length-1].t + 30000, ref = Math.max(last, txSessStart(now)), mins = ms => Math.round(ms / 60000);
     if(now - TW.pollOk > 120000) return {short:`⚠ 轉接站連不上 ${mins(now - TW.pollOk)} 分`, long:`超過 ${mins(now - TW.pollOk)} 分鐘向轉接站要資料都失敗（${TW.pollErr || "連線錯誤"}）`};
