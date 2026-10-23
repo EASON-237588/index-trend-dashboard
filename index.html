@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.23.7</title>
+<title>期貨趨勢 v1.24.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -103,7 +103,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 .zoom{position:absolute;left:5px;top:5px;display:flex;gap:3px}
 .zoom button{width:24px;height:22px;border-radius:5px;border:1px solid var(--line);background:rgba(19,23,34,.85);
   color:var(--text);font-size:13px;cursor:pointer;padding:0}
-.tip{position:absolute;left:88px;top:5px;font-size:11px;color:var(--text);background:rgba(11,14,20,.85);
+.tip{position:absolute;left:115px;top:5px;font-size:11px;color:var(--text);background:rgba(11,14,20,.85);
   border:1px solid var(--line);border-radius:5px;padding:2px 6px;pointer-events:none;white-space:nowrap}
 .tip:empty{display:none}
 .wait{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
@@ -181,7 +181,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.23.7";   // v1.23.7：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.24.0";   // v1.24.0：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -975,6 +975,7 @@ function buildDOM(){
         <button data-k="${p.k}" data-z="in" title="放大">＋</button>
         <button data-k="${p.k}" data-z="out" title="縮小">－</button>
         <button data-k="${p.k}" data-z="reset" title="回到最新">⟲</button>
+        <button data-k="${p.k}" data-z="max" id="mx-${p.k}" title="這一格放到最大">⤢</button>
       </div>
       <div class="tip" id="tip-${p.k}"></div>
       <div class="wait" id="wait-${p.k}">${p.waitMsg || "載入中…"}</div>
@@ -1010,6 +1011,7 @@ function buildDOM(){
   showPage(pg);
   document.querySelectorAll(".zoom button").forEach(b => b.onclick = () => {
     const p = PAN(b.dataset.k), z = b.dataset.z;
+    if(z === "max"){ setMax(MAXK === p.k ? null : p.k); return; }
     if(z === "reset"){ p.view = {span:p.span, off:0}; p.userZoom = false; }
     else zoomAt(p, z === "in" ? 0.7 : 1/0.7, 1);
     draw(p);
@@ -1424,10 +1426,21 @@ function renderTrades(){
 
 /* v1.3.0 分頁：只顯示目前那頁的兩格；四格資料都在背景持續更新，切頁不重新載入。記住上次停的頁。 */
 const PAGE_KEY = "itd-page";
+/* v1.24.0 單格放大（使用者 2026-10-23 要求）：每格左上角多一顆 ⤢，按下去同一頁其他格先藏起來，
+   這一格撐滿整個圖表區；再按一次（⤡）、按 Esc 或換分頁就恢復。藏起來的格子資料照常在背景更新。 */
+let MAXK = null, CURPG = "short";
+function setMax(k){
+  MAXK = k;
+  for(const p of PANELS){ const b = $("mx-" + p.k); b.textContent = p.k === k ? "⤡" : "⤢"; b.title = p.k === k ? "恢復原本排列" : "這一格放到最大"; }
+  showPage(CURPG);
+}
+document.addEventListener("keydown", e => { if(e.key === "Escape" && MAXK) setMax(null); });
 function showPage(pg){
   if(!PANELS.some(p => p.pg === pg)) pg = "short";
+  if(MAXK && PAN(MAXK).pg !== pg){ MAXK = null; for(const p of PANELS){ const b = $("mx-" + p.k); b.textContent = "⤢"; b.title = "這一格放到最大"; } }
+  CURPG = pg;
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.pg === pg));
-  for(const p of PANELS) $("p-" + p.k).hidden = p.pg !== pg;
+  for(const p of PANELS) $("p-" + p.k).hidden = p.pg !== pg || (MAXK !== null && p.k !== MAXK);
   try{ localStorage.setItem(PAGE_KEY, pg); }catch(e){}
   for(const p of PANELS) if(p.pg === pg) draw(p);
 }
@@ -1933,7 +1946,7 @@ function txSessStart(now){        // 這段開盤從幾點開始（每分鐘往�
   for(let i = 0; i < 1500 && txOpen(s - 60000); i++) s -= 60000;
   return s;
 }
-/* v1.23.7 休市（使用者 2026-10-23 要求）：10/23 台指休市，15:00 一到網頁以為夜盤開了，四格整晚亮紅色「即時中斷」。
+/* v1.24.0 休市（使用者 2026-10-23 要求）：10/23 台指休市，15:00 一到網頁以為夜盤開了，四格整晚亮紅色「即時中斷」。
    txOpen 只看時刻、不知道假日，所以改看資料：這段交易時段一根 1 秒 K 都沒有（夜盤還要當天日盤也一根都沒有）
    就當休市，改成灰色「今日休市？」。中途才停的照舊紅字；警報從開盤前就停的話也會被判成休市，所以提示裡要寫清楚。 */
 function txHoliday(now){
