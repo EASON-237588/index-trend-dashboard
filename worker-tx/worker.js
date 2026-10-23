@@ -2,8 +2,9 @@
    期交所即時行情網站不穩（2026-10-16 實測會整站回 520），改由 TradingView 警報送資料：
    台指期 1 秒圖掛一支腳本，每約 15 秒把這段 1 秒 K 打包成一則警報，打到 POST /tx/push?k=密碼。
    警報在 TradingView 伺服器上跑，三台電腦全關也照送。
-   資料存在 Durable Object 的 SQLite（KV 免費一天只能寫 1,000 次，不夠），只留最近 3 天，
-   更早的由網頁讀盤後逐筆檔。
+   資料存在 Durable Object 的 SQLite（KV 免費一天只能寫 1,000 次，不夠），只留最近 7 天
+   （2026-10-23 使用者定，原 3 天：網頁台指明細從 10/21 起算，3 天會把前段刪掉；v2 一分鐘一列，
+   7 天約 8 千列，網頁每開一次讀這些，免費額度一天 500 萬列夠開數百次），更早的由網頁讀盤後逐筆檔。
    GET /tx?since=秒  回傳 {at, sym, bars:[[t(秒), o, h, l, c, v], ...]}，t 是該根 1 秒 K 的開始時間。
    2026-10-18 加恆生：小型恆生期貨 30 秒圖掛「恆生傳送」腳本，POST /hsi/push?k=密碼（同一組密碼）、GET /hsi?since=秒，
    存在另一個 Durable Object（名稱 hsi），跟台指分開。恆生沒有盤後檔可補，策略暖機要約 2 個交易日，所以留 10 天。
@@ -17,7 +18,7 @@ const ALLOW = [/^https:\/\/eason-237588\.github\.io$/, /^http:\/\/(localhost|127
 // 2026-10-21 加 tw：台指以 TradingView 為準、一律連續月（使用者定）。台指期大台 TXF1! 30 秒圖開「依合約變更調整」，
 // 掛「台指傳送」腳本循環補送舊 K 棒；換約後補送的就是平移後的價格，以 K 棒時間覆蓋，約 70 分鐘整段換成連續月。
 // keep＝保留秒數；grp＝幾秒的 K 合成一列（v2）
-const FEEDS = {tx: {keep: 3 * 86400, sym: "TXF1!", grp: 60}, hsi: {keep: 10 * 86400, sym: "MHI1!", grp: 3600},
+const FEEDS = {tx: {keep: 7 * 86400, sym: "TXF1!", grp: 60}, hsi: {keep: 10 * 86400, sym: "MHI1!", grp: 3600},
                tw: {keep: 4 * 86400, sym: "TXF1!", grp: 3600}};
 
 function cors(origin){
