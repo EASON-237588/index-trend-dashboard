@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.26.0</title>
+<title>期貨趨勢 v1.26.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -57,7 +57,7 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 }
 .status{font-size:11px;color:var(--mute);display:flex;align-items:center;gap:5px;min-width:0;white-space:nowrap;overflow:hidden}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block;flex:none}
-.dot.live{background:#2ecc71;animation:blink 1.2s ease-in-out infinite}
+.dot.live{background:#2ecc71;animation:blink 2.4s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
 /* v1.4.2：狀態只留燈號（連線正常綠燈閃爍），文字不顯示，改成燈號的提示文字 */
 #stTxt{display:none}
@@ -80,15 +80,15 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 .ph b{font-size:14px;color:#ffd400}
 /* v1.26.0：電腦版那九格外框照部位閃爍（使用者 2026-10-24 要求）：持多螢光紅、持空螢光綠、空手不加框；只動框線深淺，不加光暈。
    取代 v1.25.1 固定的螢光藍框與 GA 固定紅框。 */
-@keyframes frLong{0%,100%{border-color:#ff1744}50%{border-color:rgba(255,23,68,.15)}}
-@keyframes frShort{0%,100%{border-color:#39ff14}50%{border-color:rgba(57,255,20,.15)}}
-.panel.fr-long{border:1px solid #ff1744;animation:frLong 1.2s ease-in-out infinite}
-.panel.fr-short{border:1px solid #39ff14;animation:frShort 1.2s ease-in-out infinite}
+@keyframes frLong{0%,100%{border-color:#ff1744}50%{border-color:rgba(255,23,68,.35)}}
+@keyframes frShort{0%,100%{border-color:#39ff14}50%{border-color:rgba(57,255,20,.35)}}
+.panel.fr-long{border:1px solid #ff1744;animation:frLong 2.4s ease-in-out infinite}
+.panel.fr-short{border:1px solid #39ff14;animation:frShort 2.4s ease-in-out infinite}
 /* v1.16.0：B2 與台指 A/B 是 2026-10-18 與 TradingView 版面 848 逐筆對齊確認過的兩格，
    商品名稱閃爍標示。只改透明度、不加光暈，字本身的清晰度不動。 */
 @keyframes blinkName{0%,100%{opacity:1}50%{opacity:.25}}
-.ph b.blink{animation:blinkName 1.2s ease-in-out infinite}
-.ph b.redblink{color:#ff2a2a;animation:blinkName 1.2s ease-in-out infinite}   /* v1.23.5：紅字閃爍，只動透明度不加光暈 */
+.ph b.blink{animation:blinkName 2.4s ease-in-out infinite}
+.ph b.redblink{color:#ff2a2a;animation:blinkName 2.4s ease-in-out infinite}   /* v1.23.5：紅字閃爍，只動透明度不加光暈 */
 /* v1.8.4：六格改叫 A～F（照畫面順序），標籤黃字（使用者 2026-10-13 要求） */
 .tag{font-size:11px;color:#ffd400;border:1px solid var(--line);border-radius:4px;padding:0 5px}
 .badge{font-size:12px;font-weight:700;border-radius:4px;padding:1px 8px;background:#2a2f3d;color:var(--mute)}
@@ -136,10 +136,10 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 /* v1.16.3（使用者 2026-10-18 要求）：交易明細的 B2 與台指 A/B 黃底深字並閃爍。
    白字在黃底上對比太低，改用選中樣式同一個深色 #0b0e14。
    寫在 .on 後面，選中與否都維持黃底深字；閃爍只動透明度，不加光暈。 */
-.tk button[data-blink]{color:#0b0e14;background:#ffd400;border-color:#ffd400;font-weight:700;animation:blinkName 1.2s ease-in-out infinite}
+.tk button[data-blink]{color:#0b0e14;background:#ffd400;border-color:#ffd400;font-weight:700;animation:blinkName 2.4s ease-in-out infinite}
 /* v1.23.4（使用者 2026-10-22 要求）：A、B2、D2、觀察二 555/23 的商品名稱紅字閃爍，明細按鈕與績效表組別共用；只動透明度、不加光暈 */
-.redblink{color:#ff2a2a;font-weight:700;animation:blinkName 1.2s ease-in-out infinite}
-.tk button[data-red],.tk button[data-red].on{color:#ff2a2a;font-weight:700;border-color:#ff2a2a;animation:blinkName 1.2s ease-in-out infinite}
+.redblink{color:#ff2a2a;font-weight:700;animation:blinkName 2.4s ease-in-out infinite}
+.tk button[data-red],.tk button[data-red].on{color:#ff2a2a;font-weight:700;border-color:#ff2a2a;animation:blinkName 2.4s ease-in-out infinite}
 .tk button[data-red].on{background:#0e121b}
 /* v1.16.4（使用者 2026-10-18 要求）：交易明細每組最上面列出週期、策略參數、資料源，紅底白字。
    來源是 PANELS 每格的 spec，跟格子本身同一份定義，不另抄一份以免兩邊走樣。 */
@@ -206,7 +206,8 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.26.0";   // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.26.1";   // v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+//    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -1082,7 +1083,7 @@ function totalHtml(p){
     return ` <span class="tot ${ud(Math.round(sum))}">${txt}</span>`;
   }catch(e){ return ""; }
 }
-/* v1.26.0：所有閃爍（外框、紅字標題、明細按鈕、即時燈號，都是 1.2 秒）起點對齊同一個時間原點，畫面上一起亮一起暗（使用者 2026-10-24 要求）。
+/* v1.26.0：所有閃爍（外框、紅字標題、明細按鈕、即時燈號，都是 2.4 秒；同日使用者嫌刺眼由 1.2 秒放慢、外框暗時留 35%）起點對齊同一個時間原點，畫面上一起亮一起暗（使用者 2026-10-24 要求）。
    動畫是各自加上樣式那一刻才起跑，不對齊就會錯開；每秒補一次，新出現的閃爍也會對齊。 */
 const BLINKS = new Set(["blink", "blinkName", "frLong", "frShort"]);
 function syncBlink(){
