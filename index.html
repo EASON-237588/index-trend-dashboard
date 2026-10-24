@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.25.0</title>
+<title>期貨趨勢 v1.25.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -78,6 +78,9 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
   border-radius:8px;padding:5px 7px 6px}
 .ph{flex:none;display:flex;align-items:center;gap:6px;white-space:nowrap}
 .ph b{font-size:14px;color:#ffd400}
+/* v1.25.1：B2、觀察二 555/23、D2 外框螢光藍細線閃爍（使用者 2026-10-24 要求，只動框線深淺、不加光暈） */
+@keyframes frameBlink{0%,100%{border-color:#00e5ff}50%{border-color:rgba(0,229,255,.15)}}
+.panel.frame{border:1px solid #00e5ff;animation:frameBlink 1.2s ease-in-out infinite}
 /* v1.16.0：B2 與台指 A/B 是 2026-10-18 與 TradingView 版面 848 逐筆對齊確認過的兩格，
    商品名稱閃爍標示。只改透明度、不加光暈，字本身的清晰度不動。 */
 @keyframes blinkName{0%,100%{opacity:1}50%{opacity:.25}}
@@ -200,7 +203,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.25.0";   // v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
+const VERSION = "v1.25.1";   // v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -499,7 +502,7 @@ function toFlatShort(R){
 
 /* ============ 面板設定（參數讀自 TradingView 版面 JuwDqkR0，2026-10-07） ============ */
 const PANELS = [
-  {k:"rf", pg:"short", red:true, title:"那斯達克", tf:"短趨勢・A", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
+  {k:"rf", pg:"short", title:"那斯達克", tf:"短趨勢・A", sym:"QQQUSDT", nq:true, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 200・倍數 23・多空反轉", src:"Binance QQQ 合約逐筆合成"},
    sub:"Range Filter 取樣 200・倍數 23・多空反轉（線色＝濾網方向）",
    P:{per:200, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
@@ -517,7 +520,7 @@ const PANELS = [
      B2 37 秒 450/23 為 17 筆、勝率 41%、+1,675（37、38 秒 350～550 都在 +1,470～1,675）；
      B3 22 秒 50/45 為 9 筆、勝率 67%、+1,532（取樣 50 是掃描下限，周圍未確認）。都是同一段資料挑的，會偏好看。
      Gate 沒有 37、22 秒的原生 K，兩格用逐筆成交自己合成（GTR）。原 B2（30 秒 500/60）與 C 格（Hyperliquid 1 分）刪除。 */
-  {k:"gate2", red:true, pg:"short", title:"那斯達克", tf:"短趨勢・B2", sym:"QQQ_USDT", src:"gtr", tfSec:37, nq:true, kind:"rf", span:1e9,
+  {k:"gate2", red:true, frame:true, pg:"short", title:"那斯達克", tf:"短趨勢・B2", sym:"QQQ_USDT", src:"gtr", tfSec:37, nq:true, kind:"rf", span:1e9,
    spec:{tf:"37 秒", par:"Range Filter 取樣 450・倍數 23・多空反轉", src:"Gate QQQ 合約逐筆合成"},
    sub:"Gate QQQ 合約逐筆合成 37 秒 K・Range Filter 取樣 450・倍數 23",
    P:{per:450, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
@@ -549,7 +552,7 @@ const PANELS = [
   /* D2（使用者 2026-10-15 要求，放在 D 正下方）：同 D 的資料與算法，只換參數 200 小時／停損 6 ATR、空手改放空（不擋）。
      TradingView NQ1! 6 分 2008-10～2026-10 掃 162 組：200/6 多空都做 +1,064 點（空單 −11,996，2022 空頭年 +3,587），
      只做多 200/6 +13,060、抱著約 +25,700。使用者認為空頭時代要來，並行觀察。 */
-  {k:"nq6b", pg:"long", red:true, title:"那斯達克", tf:"中長趨勢・D2", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
+  {k:"nq6b", pg:"long", red:true, frame:true, title:"那斯達克", tf:"中長趨勢・D2", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", tfMin:6, span:1e9, flatCol:"#4cff00", flatShort:true,
    spec:{tf:"6 分", par:"Donchian 回看 200 小時・停損 6 ATR・空手改放空", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
    sub:"NQ 期貨單一月份合約 6 分（同 D）・Donchian 回看 200 小時（2,000 根）・停損 6 ATR・空手改放空（不擋）",
    P:{lookH:200, mode:"long", stopAtr:6, atrLen:14, tfMin:6}},
@@ -585,7 +588,7 @@ const PANELS = [
      那斯達克 555/23 +7.71%（唯一三個商品前後半都賺的參數）、微台 555/23 +6.64%、那斯達克 37/37 +7.76%（回落 1.32% 最平順）、
      恆生 555/25.5 +6.11%（勝率 65%、回落 0.96%，但只有 2.5 週 17 筆）。參數照 848 不改；那斯達克兩格用 B 格同一份 Gate 30 秒原生 K、
      微台用台指頁的 30 秒 K。恆生沒有免費 30 秒資料源，先放空格，等使用者決定接法。 */
-  {k:"o2nq", red:true, pg:"obs2", title:"那斯達克", tf:"觀察二・555/23", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
+  {k:"o2nq", red:true, frame:true, pg:"obs2", title:"那斯達克", tf:"觀察二・555/23", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 23・多空反轉", src:"Gate QQQ 合約原生 30 秒 K"},
    sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 555・倍數 23（848 左中）",
    P:{per:555, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
@@ -985,7 +988,7 @@ function recompute(p){
 function buildDOM(){
   $("ver").textContent = VERSION;
   $("grid").innerHTML = PANELS.map(p => `
-  <section class="panel" id="p-${p.k}">
+  <section class="panel${p.frame?" frame":""}" id="p-${p.k}">
     <div class="ph"><b${p.red?' class="redblink"':p.blink?' class="blink"':''}>${p.title}</b><span class="tag">${p.tf}</span><span class="badge" id="dir-${p.k}">—</span><span class="px" id="px-${p.k}"></span></div>
     <div class="kv" id="kv-${p.k}"></div>
     <div class="cw">
