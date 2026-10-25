@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.26.2</title>
+<title>期貨趨勢 v1.27.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -89,6 +89,7 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 @keyframes blinkName{0%,100%{opacity:1}50%{opacity:.25}}
 .ph b.blink{animation:blinkName 2.4s ease-in-out infinite}
 .ph b.redblink{color:#ff2a2a;animation:blinkName 2.4s ease-in-out infinite}   /* v1.23.5：紅字閃爍，只動透明度不加光暈 */
+.ph b.whiteblink{color:#fff;animation:blinkName 2.4s ease-in-out infinite}   /* v1.27.0：GA 優化前三名，商品名稱白字閃爍 */
 /* v1.8.4：六格改叫 A～F（照畫面順序），標籤黃字（使用者 2026-10-13 要求） */
 .tag{font-size:11px;color:#ffd400;border:1px solid var(--line);border-radius:4px;padding:0 5px}
 .badge{font-size:12px;font-weight:700;border-radius:4px;padding:1px 8px;background:#2a2f3d;color:var(--mute)}
@@ -170,10 +171,18 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 /* v1.25.0 電腦版排版（使用者 2026-10-23 決定：手機版與電腦版同一份程式，依螢幕寬度自動切，也可手動選）。
    電腦版＝這一頁的格子並排、自動換行，可上下捲動；規則、資料、交易明細完全不動。 */
 .lay-w .app{max-width:none}
-/* 電腦版：指定的 9 格同一頁、不捲動、不翻頁，三欄三列，每格一樣大；分頁列隱藏 */
+/* 電腦版：指定的 12 格同一頁、不捲動、不翻頁，四欄三列（v1.27.0 由三欄改四欄，第 4 欄放 GA 優化前三名），每格一樣大；分頁列隱藏 */
 .lay-w #tabs{display:none}
-.lay-w .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;padding:0 8px 8px;overflow:hidden}
+.lay-w .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;padding:0 8px 8px;overflow:hidden}
 .lay-w .panel{flex:none;height:auto;min-height:0}
+/* v1.27.0 四欄後每格變窄：標題列縮字、組合名稱放不下時用「…」收尾，現價固定在最右邊不溢出到隔壁格 */
+.lay-w .ph{gap:4px;overflow:hidden;min-width:0}
+.lay-w .ph b{font-size:12.5px;flex:none}
+.lay-w .tag{font-size:10.5px;padding:0 3px;min-width:0;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+.lay-w .badge{font-size:11px;padding:1px 5px;flex:none}
+.lay-w .badge .tot{font-size:11px;margin-left:4px}
+.lay-w .px{font-size:13px;flex:none}
+.lay-w .px small{font-size:10.5px;margin-left:4px}
 .lay-w .grid.mx{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
 </style>
 </head>
@@ -206,7 +215,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.26.2";   // v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+const VERSION = "v1.27.0";   // v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
 //    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
@@ -514,6 +523,22 @@ const PANELS = [
    spec:{tf:"37 秒", par:"Range Filter 取樣 300・倍數 23・多空反轉", src:"Gate QQQ 合約逐筆合成"},
    sub:"Gate QQQ 合約逐筆合成 37 秒 K・Range Filter 取樣 300・倍數 23",
    P:{per:300, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  /* v1.27.0（使用者 2026-10-25「前三名列入」）：GA 優化在 TradingView 長樣本（30 秒 2023-12 起、45 秒 2022-09 起，約 400 組）的排名前三。
+     37 秒甲＝450/28.5、乙＝700/30，依帶寬換算到 30 秒（倍數 ×1.12）、45 秒（÷1.11）。長樣本 1 口微型扣成本：
+     甲 30 秒 +92.3 萬／回落 −26.2、乙 45 秒 +80.6／−32.1、甲 45 秒 +79.7／−32.0（GA 換算後 +69.9／+46.6）。
+     2022-23 與 2026 年幾乎所有參數都賺不到，獲利集中在 2025。資料同 GA：Gate QQQ 合約逐筆合成。 */
+  {k:"j30", white:true, pg:"short", title:"那斯達克", tf:"甲 30秒 555/31.9（第1名）", sym:"QQQ_USDT", src:"gtr", tfSec:30, nq:true, kind:"rf", span:1e9,
+   spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 31.9・多空反轉", src:"Gate QQQ 合約逐筆合成"},
+   sub:"Gate QQQ 合約逐筆合成 30 秒 K・Range Filter 取樣 555・倍數 31.9（GA 優化第 1 名・甲）",
+   P:{per:555, mult:31.9, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  {k:"y45", white:true, pg:"short", title:"那斯達克", tf:"乙 45秒 576/27（第2名）", sym:"QQQ_USDT", src:"gtr", tfSec:45, nq:true, kind:"rf", span:1e9,
+   spec:{tf:"45 秒", par:"Range Filter 取樣 576・倍數 27・多空反轉", src:"Gate QQQ 合約逐筆合成"},
+   sub:"Gate QQQ 合約逐筆合成 45 秒 K・Range Filter 取樣 576・倍數 27（GA 優化第 2 名・乙）",
+   P:{per:576, mult:27, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
+  {k:"j45", white:true, pg:"short", title:"那斯達克", tf:"甲 45秒 370/25.7（第3名）", sym:"QQQ_USDT", src:"gtr", tfSec:45, nq:true, kind:"rf", span:1e9,
+   spec:{tf:"45 秒", par:"Range Filter 取樣 370・倍數 25.7・多空反轉", src:"Gate QQQ 合約逐筆合成"},
+   sub:"Gate QQQ 合約逐筆合成 45 秒 K・Range Filter 取樣 370・倍數 25.7（GA 優化第 3 名・甲）",
+   P:{per:370, mult:25.7, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.6.0：A-2（取樣 400・倍數 16）拿掉，改放 Gate 版（使用者 2026-10-12 指定）。
      規則與 A-1 完全相同（30 秒 Range Filter 200/23），只換資料源：Gate QQQ_USDT 合約的原生 30 秒 K。
      為什麼：Binance 擋 Cloudflare，A-1 沒辦法雲端推播；Gate 連得到，LINE 推播改推這組。
@@ -997,7 +1022,7 @@ function buildDOM(){
   $("ver").textContent = VERSION;
   $("grid").innerHTML = PANELS.map(p => `
   <section class="panel" id="p-${p.k}">
-    <div class="ph"><b${p.red?' class="redblink"':p.blink?' class="blink"':''}>${p.title}</b><span class="tag">${p.tf}</span><span class="badge" id="dir-${p.k}">—</span><span class="px" id="px-${p.k}"></span></div>
+    <div class="ph"><b${p.red?' class="redblink"':p.white?' class="whiteblink"':p.blink?' class="blink"':''}>${p.title}</b><span class="tag">${p.tf}</span><span class="badge" id="dir-${p.k}">—</span><span class="px" id="px-${p.k}"></span></div>
     <div class="kv" id="kv-${p.k}"></div>
     <div class="cw">
       <canvas id="cv-${p.k}"></canvas>
@@ -1170,6 +1195,9 @@ function renderInfo(p){
    紀錄用逐筆合成），下次開工跑紀錄後以正式紀錄為準。 */
 const TRADE_K = [
   {k:"GA", pk:"rf",    name:"GA",   unit:"點"},   // v1.26.0 A 改 Gate 37 秒 300/23（紀錄代號 GA）；舊幣安 A（紀錄代號 A）不再列
+  {k:"J30", pk:"j30", name:"甲 30秒 555/31.9（第1名）", unit:"點"},   // v1.27.0 GA 優化前三名，紀錄代號 J30／Y45／J45，10/6 起算（10/25 以前是回算）
+  {k:"Y45", pk:"y45", name:"乙 45秒 576/27（第2名）", unit:"點"},
+  {k:"J45", pk:"j45", name:"甲 45秒 370/25.7（第3名）", unit:"點"},
   {k:"A", pk:"a_old",  name:"舊 A",  unit:"點"},   // v1.26.2 使用者要求加回明細與績效表：格子已拿掉，只讀正式紀錄、沒有◆與浮動
   {k:"G", pk:"gate",   name:"B",    unit:"點"},
   {k:"G2", pk:"gate2", red:true, name:"B2",   unit:"點"},   // v1.23.4 紅字閃爍（取代原黃底閃爍）   // v1.10.0 起 37 秒 450/23（Gate 逐筆合成）
@@ -1387,7 +1415,8 @@ function specBar(T){
    - 篩選：已平倉 ≥ 20、獲利因子 ≥ 1.5、合計 > 0 三項都過才通過；篩選名次依獲利因子由高到低；未滿 1.55 加註。
    - 開工回報用的 skills/index-trend-ops/scripts/daily_table.js 是同一套規則，改這裡要兩邊一起改。 */
 const SUM_NAME = {
-  GA:"那斯達克・GA（37 秒 300/23）", A:"那斯達克・舊 A（幣安 30 秒）", G:"那斯達克・B（30 秒）", G2:"那斯達克・B2（37 秒）", G3:"那斯達克・B3（22 秒）",
+  GA:"那斯達克・GA（37 秒 300/23）", J30:"那斯達克・甲（30 秒 555/31.9，第1名）", Y45:"那斯達克・乙（45 秒 576/27，第2名）", J45:"那斯達克・甲（45 秒 370/25.7，第3名）",
+  A:"那斯達克・舊 A（幣安 30 秒）", G:"那斯達克・B（30 秒）", G2:"那斯達克・B2（37 秒）", G3:"那斯達克・B3（22 秒）",
   C:"那斯達克・D（6 分）", C2:"那斯達克・D2（6 分）", D:"黃金・E（8 分）", E:"黃金・F（11 分）",
   TX1:"台指・A/B", TX2:"台指・B2", TX3:"台指・B3", TX4:"台指・觀察二 台指",
   O1:"那斯達克・觀察二 555/23", O2:"那斯達克・觀察二 37/37", HSI:"恆生・觀察二 恆生",
@@ -1502,8 +1531,9 @@ function setMax(k){
 document.addEventListener("keydown", e => { if(e.key === "Escape" && MAXK) setMax(null); });
 /* v1.25.0 排版：手機版（分頁單欄）或電腦版（15 格同一頁）。自動＝螢幕寬 1280px 以上用電腦版；手動選的存在這台瀏覽器。 */
 const LAY_KEY = "itd-layout", LAY_NEXT = {auto:"m", m:"w", w:"auto"}, LAY_TXT = {auto:"自動", m:"手機", w:"電腦"};
-/* 電腦版保留的 9 格與位置（列, 欄）：第 1 列 A、B2、那斯達克觀察二 555/23；第 2 列 D2、台指 B2、台指觀察二；第 3 列 黃金 F、黃金 E、恆生觀察二 */
-const BOARD_AT = {rf:[1,1], gate2:[1,2], o2nq:[1,3], nq6b:[2,1], tx37:[2,2], o2tx:[2,3], gold11:[3,1], gold8:[3,2], o2hsi:[3,3]};
+/* 電腦版保留的 12 格與位置（列, 欄）：第 1 列 A、B2、那斯達克觀察二 555/23；第 2 列 D2、台指 B2、台指觀察二；第 3 列 黃金 F、黃金 E、恆生觀察二；
+   v1.27.0 第 4 欄由上而下 GA 優化第 1～3 名（甲 30 秒、乙 45 秒、甲 45 秒） */
+const BOARD_AT = {rf:[1,1], gate2:[1,2], o2nq:[1,3], j30:[1,4], nq6b:[2,1], tx37:[2,2], o2tx:[2,3], y45:[2,4], gold11:[3,1], gold8:[3,2], o2hsi:[3,3], j45:[3,4]};
 function layMode(){ try{ return localStorage.getItem(LAY_KEY) || "auto"; }catch(e){ return "auto"; } }
 function applyLayout(){
   const mode = layMode(), wide = mode === "w" || (mode === "auto" && window.innerWidth >= 1280);
@@ -1688,7 +1718,7 @@ function setHoverT(t){
 /* 同步顯示範圍（使用者 2026-10-23 要求）：那斯達克、台指、恆生各自一組，組內任一格縮放或拖曳，其他格顯示同一段時間。黃金不同步。
    只在使用者動過圖之後才同步；格子的 K 棒週期不同（30 秒、37 秒、6 分…），所以用時間對齊、不用根數。 */
 const SYNC_GROUP = {};
-for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","nq6","nq6b","o2nq","o2nq37"], tx:["tx30","tx37","tx22","o2tx"], hsi:["o2hsi"]}))
+for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","nq6","nq6b","o2nq","o2nq37","j30","y45","j45"], tx:["tx30","tx37","tx22","o2tx"], hsi:["o2hsi"]}))
   for(const k of keys) SYNC_GROUP[k] = g;
 function syncView(p){
   const g = SYNC_GROUP[p.k];
@@ -1811,7 +1841,7 @@ async function pollGate(p){
    同一毫秒的成交依價格、數量排序（同 Python 的 tuple 排序）。
    第一次往回抓 5 天（B2 暖機約 2,700 根≈28 個交易小時，中間可能隔週末），每 15 分鐘一段、8 段同時抓、滿 1,000 筆對半切；
    合成好的 K 每分鐘存進瀏覽器，重開時丟掉最後 10 分鐘那幾根、只從那裡補抓。之後每 10 秒輪詢新成交（只收編號更大的）。 */
-const GTR = {bars:{}, lastId:0, lastT:0, ready:false}, GTR_TFS = [37, 22], GTR_KEY = "itd-gtr-v1";
+const GTR = {bars:{}, lastId:0, lastT:0, ready:false}, GTR_TFS = [37, 22, 30, 45], GTR_KEY = "itd-gtr-v2";   // v1.27.0 加 30、45 秒（前三名），快取換名讓第一次重抓 5 天
 const gtrTr = x => [Math.round(+x.create_time * 1000), +x.price, Math.abs(+x.size), x.id];
 const gtrSort = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 function gtrAdd(B, ms, trades){
@@ -1848,7 +1878,7 @@ async function gtrFetch(fromMs, prog){
     while(i < segs.length){
       const s = segs[i++];
       for(const x of await gtrPage(s[0], s[1])) got.set(x.id, x);
-      done++; if(prog) setLoad("gtr", done / segs.length, `Gate 逐筆（A、B2、B3）${Math.round(done / segs.length * 100)}%`);
+      done++; if(prog) setLoad("gtr", done / segs.length, `Gate 逐筆（GA、B2、B3、前三名）${Math.round(done / segs.length * 100)}%`);
     }
   };
   await Promise.all(Array.from({length:8}, worker));
