@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.31.3</title>
+<title>期貨趨勢 v1.32.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -224,7 +224,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.31.3";   // v1.31.3：觀察二 555/23（左中）改用 Gate 逐筆合成 30 秒（原生 30 秒只回溯約 3.5 天，畫面從 10/23 起、跟旁邊格對不起來；紀錄 O1 本來就用逐筆合成）。 v1.31.2：藍色分組框再改 1px，跟紅框同粗。v1.31.1：藍框由 3px 改 2px（使用者嫌太粗）。 v1.31.0：只有篩選前四名紅字閃爍，其餘黑底黃字不閃。 v1.30.0：中長趨勢加 E 甲、F 甲（E、F 加幣安 PAXG 日線 200 日偏多，永遠在場），明細與績效表加兩組（紀錄 EG／FG，7/15 起算），電腦版改 6 欄。v1.29.3：D 甲乙丙起算列改真正進場日（4/06、4/08），格子找不到進場訊號時改讀正式紀錄，跟交易明細一致。v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+const VERSION = "v1.32.0";   // v1.32.0：績效表篩選加嚴格四關（拿掉最大一筆仍賺、前後段都賺、合計 ≥ 回落 2 倍、連虧 ≤ 7），前四名紅字照新篩選。 v1.31.3：觀察二 555/23（左中）改用 Gate 逐筆合成 30 秒（原生 30 秒只回溯約 3.5 天，畫面從 10/23 起、跟旁邊格對不起來；紀錄 O1 本來就用逐筆合成）。 v1.31.2：藍色分組框再改 1px，跟紅框同粗。v1.31.1：藍框由 3px 改 2px（使用者嫌太粗）。 v1.31.0：只有篩選前四名紅字閃爍，其餘黑底黃字不閃。 v1.30.0：中長趨勢加 E 甲、F 甲（E、F 加幣安 PAXG 日線 200 日偏多，永遠在場），明細與績效表加兩組（紀錄 EG／FG，7/15 起算），電腦版改 6 欄。v1.29.3：D 甲乙丙起算列改真正進場日（4/06、4/08），格子找不到進場訊號時改讀正式紀錄，跟交易明細一致。v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
 //    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
@@ -1525,7 +1525,7 @@ function specBar(T){
    - 合計＝只算已平倉（不含持有中浮動，和各組頁面含浮動的「合計」不同）；那斯達克、台指用 costOf 扣成本換台幣，
      黃金是美元／盎司，恆生沒有成本規則→點數。賺／賠、勝率照 tradesOf 的 win（點數 > 0 算賺）。
    - 獲利因子＝扣成本後賺的合計÷賠的合計。台幣組（那斯達克、台指、恆生）依合計排名，黃金只在黃金內排名。
-   - 篩選：已平倉 ≥ 20、獲利因子 ≥ 1.5、合計 > 0 三項都過才通過；篩選名次依獲利因子由高到低；未滿 1.55 加註。
+   - 篩選：已平倉 ≥ 20、獲利因子 ≥ 1.5、合計 > 0，加上 v1.32.0 嚴格四關（strictFail），七關全過才通過；篩選名次依獲利因子由高到低；未滿 1.55 加註。
    - 開工回報用的 skills/index-trend-ops/scripts/daily_table.js 是同一套規則，改這裡要兩邊一起改。 */
 const SUM_NAME = {
   GA:"那斯達克・GA（37 秒 300/23）", J30:"那斯達克・甲（30 秒 555/31.9，第1名）", Y45:"那斯達克・乙（45 秒 576/27，第2名）", J45:"那斯達克・甲（45 秒 370/25.7，第3名）",
@@ -1538,6 +1538,17 @@ const SUM_NAME = {
   R30:"那斯達克・G（30 秒，Gate）", R1:"那斯達克・H（1 分）", R2:"那斯達克・I（2 分）",
 };
 const SUM_MIN_N = 20, SUM_MIN_PF = 1.5;
+/* v1.32.0（2026-10-26 使用者看過試算後要求加入）：篩選在原本三關之外再加嚴格四關，七關全過才算「通過」、才有篩選名次與紅字。
+   ① 拿掉賺最多那一筆，合計仍為正　② 前後兩段都賺　③ 合計 ≥ 最大回落 × 2　④ 最多連虧 ≤ 7 筆 */
+const SUM_DD_X = 2, SUM_MAX_LOSE = 7;
+function strictFail(r){
+  const why = [];
+  if(!(r.sum - r.top > 0)) why.push("拿掉最大一筆就不賺");
+  if(!(r.n1 && r.n2 && r.s1 > 0 && r.s2 > 0)) why.push(r.n2 && r.s2 <= 0 ? "後段虧錢" : r.n1 && r.s1 <= 0 ? "前段虧錢" : "前後段沒有都平倉");
+  if(r.dd && r.sum < r.dd * SUM_DD_X) why.push(`回落太大（合計只有回落的 ${(r.sum / r.dd).toFixed(2)} 倍）`);
+  if(r.lose > SUM_MAX_LOSE) why.push(`連虧 ${r.lose} 筆`);
+  return why;
+}
 /* v1.31.0（2026-10-26 使用者要求）：格子標題、明細按鈕、績效表組別名稱，只有「篩選前四名」（台幣組篩選名次 1～4）紅字閃爍，
    其餘一律黑底黃字不閃。名次照績效表同一套算法，每 30 秒重算，名次變了紅字自動換人；原本寫死在各格的紅／白／黃閃爍旗標已拿掉。 */
 let TOP4 = new Set();
@@ -1563,10 +1574,19 @@ function sumRows(){   // 績效表與篩選前四名共用
     const pos = nets.filter(v => v > 0).reduce((a, b) => a + b, 0), neg = -nets.filter(v => v < 0).reduce((a, b) => a + b, 0);
     liveN += R.trades.filter(x => x.live).length;
     if(R.upTo && R.upTo > upTo) upTo = R.upTo;
+    // v1.32.0 嚴格四關用：前後段以「第一筆進場～現在」的中點切（看出場時間），回落＝已平倉累計曲線從高點掉下最多，連虧＝最多連續虧損筆數
+    const mid = R.trades.length ? (R.trades[0].et + Date.now()) / 2 : 0;
+    let s1 = 0, s2 = 0, n1 = 0, n2 = 0, cum = 0, peak = 0, dd = 0, run = 0, lose = 0;
+    nets.forEach((v, i) => {
+      if(R.trades[i].xt < mid){ s1 += v; n1++; } else { s2 += v; n2++; }
+      cum += v; peak = Math.max(peak, cum); dd = Math.max(dd, peak - cum);
+      run = v < 0 ? run + 1 : 0; lose = Math.max(lose, run);
+    });
     return {...base, twd:!!C, cnt:R.cnt, win:R.win, sum:pos - neg,
-      pf:!R.cnt ? null : neg ? pos / neg : pos ? Infinity : 0, rate:R.cnt ? R.win / R.cnt * 100 : null};
+      pf:!R.cnt ? null : neg ? pos / neg : pos ? Infinity : 0, rate:R.cnt ? R.win / R.cnt * 100 : null,
+      top:nets.length ? Math.max(...nets) : 0, s1, s2, n1, n2, dd, lose};
   });
-  const pass = r => !r.wait && r.cnt >= SUM_MIN_N && r.pf >= SUM_MIN_PF && r.sum > 0;
+  const pass = r => !r.wait && r.cnt >= SUM_MIN_N && r.pf >= SUM_MIN_PF && r.sum > 0 && !strictFail(r).length;
   const byOrder = list => {
     const ok = list.filter(r => !r.wait).sort((a, b) => b.sum - a.sum);
     const scr = ok.filter(pass).sort((a, b) => b.pf - a.pf);
@@ -1584,6 +1604,7 @@ function renderSummary(){
     const why = [];
     if(r.cnt < SUM_MIN_N) why.push(`已平倉不足 ${SUM_MIN_N} 筆`);
     if(r.sum <= 0) why.push("合計為負"); else if(r.pf < SUM_MIN_PF) why.push(`獲利因子不足 ${SUM_MIN_PF}`);
+    if(r.sum > 0) why.push(...strictFail(r));   // 合計為負時嚴格四關必然不過，不重複列
     return "未通過：" + why.join("，");
   };
   const money = r => { const s = sgn(r.sum); return r.gold ? s + " 美元" : r.twd || !r.cnt ? s : s + " 點"; };
@@ -1600,7 +1621,7 @@ function renderSummary(){
   const body = sec("台幣組（那斯達克、台指、恆生）依合計排名") + twd.ok.map((r, i) => tr(r, i, twd, false)).join("") + twd.wait.map(trW).join("") +
     sec("黃金只在黃金內排名") + gold.ok.map((r, i) => tr(r, i, gold, true)).join("") + gold.wait.map(trW).join("");
   return `<div class="tsum"><div class="tot" style="font-size:18px">績效表</div>
-      <div>通過篩選：台幣組 ${twd.scr.length} 組${gold.scr.length ? `、黃金 ${gold.scr.length} 組` : ""}（已平倉 ≥ ${SUM_MIN_N} 筆、獲利因子 ≥ ${SUM_MIN_PF}、合計 > 0）</div></div>
+      <div>通過篩選：台幣組 ${twd.scr.length} 組${gold.scr.length ? `、黃金 ${gold.scr.length} 組` : ""}（已平倉 ≥ ${SUM_MIN_N} 筆、獲利因子 ≥ ${SUM_MIN_PF}、合計 > 0；拿掉最大一筆仍賺、前後段都賺、合計 ≥ 最大回落 ${SUM_DD_X} 倍、連虧 ≤ ${SUM_MAX_LOSE} 筆）</div></div>
     <div class="stw"><table class="tt st"><thead><tr><th>組別</th><th>已平倉（賺／賠）</th><th>合計</th><th>獲利因子</th><th>勝率</th><th>獲利名次</th><th>篩選名次</th><th>備註</th></tr></thead>
       <tbody>${body}</tbody></table></div>
     <div class="tnote">合計只算已平倉，不含持有中浮動（各組頁面的「合計」有含浮動，兩者不同）・那斯達克：微型 1 口、單邊手續費 ${MNQ.fee} 美元、匯率 ${MNQ.rate.toFixed(2)}・台指：微台 1 口、單邊手續費 ${TMF.fee} 元＋期交稅・黃金：美元／盎司、未扣成本・恆生：點數、未扣成本（手續費與匯率在各組頁面改）<br>
