@@ -50,7 +50,11 @@ START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B":
          "R30": ms(2026, 10, 14), "R1": ms(2026, 10, 14), "R2": ms(2026, 10, 14), "C2": ms(2026, 7, 15), "G2": ms(2026, 10, 6), "G3": ms(2026, 10, 6),
          "O1": ms(2026, 10, 6), "O2": ms(2026, 10, 6), "GA": ms(2026, 10, 6),
          "J30": ms(2026, 10, 6), "Y45": ms(2026, 10, 6), "J45": ms(2026, 10, 6),
-         "DA": ms(2026, 7, 15), "DB": ms(2026, 7, 15), "DC": ms(2026, 7, 15)}
+         "DA": ms(2026, 7, 15), "DB": ms(2026, 7, 15), "DC": ms(2026, 7, 15),
+         "EG": ms(2026, 7, 15), "FG": ms(2026, 7, 15)}
+# EG、FG（畫面 E 甲／F 甲，2026-10-26 使用者要求加上去）：E、F 加幣安 PAXG 日線 200 日偏多、永遠在場內。EG＝E 的 8 分 K 通道反手，
+#   日線在均線上時空單改做多（TV 規則 7、出場線比例 1）；FG＝F 的 11 分 K 與進出，原規則空手時日線在均線上做多、之下放空（TV 規則 4）。
+#   起算 7/15；起算當下已有的部位往回找真正進場時間與價格（D 甲乙丙的教訓），第一次跑多抓 150 天。
 # DA、DB、DC（畫面 D 甲／乙／丙，2026-10-26 使用者要求列入中長趨勢）：同 C 的 Yahoo 6 分 K，規則 7 出場線反手＋日線偏多、永遠在場內
 #   （TradingView「期貨趨勢D多空反手」，2008 起 181 組細掃的高原中心）。起算比照中長趨勢 7/15，10/26 以前是回算；換月時跟 C2 一樣還不會記換倉。
 # J30、Y45、J45（2026-10-25 使用者要求「前三名列入」）：GA 優化（TradingView 長樣本 30＋45 秒約 400 組）排名前三，
@@ -66,13 +70,15 @@ START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B":
 # 10/15 以前是回算、不是當時實際記的。換月（12/11）時跟 R2 一樣還不會記換倉。
 # 2026-10-14 使用者要求 D、E 回溯拉到最大：XAUUSDT 2025/12/11 上市、PAXGUSDT 1 分 K 從 2020/08/28，各扣 350 小時暖機。
 # C 維持 8/15：單一月份合約的真 5 分 K 只有 60 天，更早只剩小時 K（9 月約已下市）。
-ORDER = ["GA", "J30", "Y45", "J45", "A", "G", "G2", "G3", "C", "C2", "DA", "DB", "DC", "D", "E", "R30", "R1", "R2", "O1", "O2"]
+ORDER = ["GA", "J30", "Y45", "J45", "A", "G", "G2", "G3", "C", "C2", "DA", "DB", "DC", "D", "E", "EG", "FG", "R30", "R1", "R2", "O1", "O2"]
 # LABEL 是畫面代號（v1.8.4 起照畫面順序叫 A～F），只用在印績效與曲線圖標題；紀錄檔「格子」欄仍是左邊的內部代號。
-LABEL = {"GA": "GA", "A": "A（舊，幣安）", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I", "C2": "D2", "G2": "B2", "G3": "B3", "O1": "觀察二", "O2": "觀察二", "J30": "甲30", "Y45": "乙45", "J45": "甲45", "DA": "D甲", "DB": "D乙", "DC": "D丙"}
+LABEL = {"GA": "GA", "A": "A（舊，幣安）", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I", "C2": "D2", "G2": "B2", "G3": "B3", "O1": "觀察二", "O2": "觀察二", "J30": "甲30", "Y45": "乙45", "J45": "甲45", "DA": "D甲", "DB": "D乙", "DC": "D丙", "EG": "E甲", "FG": "F甲"}
 NAME = {"A": "那斯達克短趨勢（Binance 30 秒，取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢（Gate 30 秒，取樣 200、倍數 23）", "B": "那斯達克短趨勢（1 分，取樣 100、倍數 16）", "C": "那斯達克中長趨勢（6 分，空手放空）", "D": "黃金中長趨勢（8 分）", "E": "黃金中長趨勢（11 分，空手放空）",
         "R30": "那斯達克觀察（30 秒 ATR 反手 60/70＋日線 60）", "R1": "那斯達克觀察（1 分 ATR 反手 60/50＋日線 60）", "R2": "那斯達克觀察（2 分 ATR 反手 60/70＋日線 60）",
         "C2": "那斯達克觀察（6 分，通道 200 小時、停損 6 ATR，空手放空）",
         "DA": "那斯達克中長趨勢（6 分出場線反手 350 小時、出場線 140 小時、日線 150 日偏多）",
+        "EG": "黃金中長趨勢（8 分通道反手 350 小時＋PAXG 日線 200 日偏多）",
+        "FG": "黃金中長趨勢（11 分通道 350 小時、停損 8 ATR，空手時 PAXG 日線 200 日之上做多）",
         "DB": "那斯達克中長趨勢（6 分出場線反手 350 小時、出場線 140 小時、日線 200 日偏多）",
         "DC": "那斯達克中長趨勢（6 分出場線反手 450 小時、出場線 180 小時、日線 200 日偏多）",
         "G2": "那斯達克短趨勢（Gate 37 秒，取樣 450、倍數 23）",
@@ -81,7 +87,7 @@ NAME = {"A": "那斯達克短趨勢（Binance 30 秒，取樣 200、倍數 23）
         "O1": "那斯達克（Gate 30 秒，取樣 555、倍數 23）", "O2": "那斯達克（Gate 30 秒，取樣 37、倍數 37）",
         "J30": "那斯達克前三名・甲（Gate 30 秒，取樣 555、倍數 31.9）", "Y45": "那斯達克前三名・乙（Gate 45 秒，取樣 576、倍數 27）",
         "J45": "那斯達克前三名・甲（Gate 45 秒，取樣 370、倍數 25.7）"}
-GOLD = ("D", "E")   # 單位是美元/盎司
+GOLD = ("D", "E", "EG", "FG")   # 單位是美元/盎司
 
 # C 格合約與換月日（CME 慣例：到期前約一週的週四換到下一季）。過了最後一列要往下加
 C_CONTRACTS = [
@@ -363,7 +369,7 @@ def calc_don(B, lookH, tf, mode, stop_atr, atr_len=14):
         pos[i] = side
     return pos, look
 
-def calc_r7(B, lookH, tf, ex_div, ma_len, daily):
+def calc_r7(B, lookH, tf, ex_div, ma_len, daily, up_fn=None):
     """D 甲乙丙：照 index.html 的 calcDon7（＝TradingView「期貨趨勢D多空反手」規則 7）。永遠在場內。
     第一次用回看通道定方向，之後多單跌破出場線（回看÷ex_div）翻空、空單突破出場線翻多；前一日收盤在 ma_len 日均線以上時空單改做多。"""
     n = len(B); look = min(4999, max(2, round(lookH * 60 / tf))); exn = max(10, round(look / ex_div))
@@ -375,7 +381,7 @@ def calc_r7(B, lookH, tf, ex_div, ma_len, daily):
         if r == 0: r = 1 if hh[i] is not None and c > hh[i] else -1 if ll[i] is not None and c < ll[i] else 0
         elif r == 1: r = -1 if le[i] is not None and c < le[i] else 1
         else: r = 1 if he[i] is not None and c > he[i] else -1
-        pos[i] = 1 if r == 1 or daily_up(B[i][0], ma_len, daily) else -1
+        pos[i] = 1 if r == 1 or (up_fn(B[i][0]) if up_fn else daily_up(B[i][0], ma_len, daily)) else -1
     return pos, look
 
 def calc_don_g(B, lookH=350, tf=11, stop_atr=8, atr_len=14):
@@ -440,6 +446,28 @@ def daily_nq():
     """連續月 NQ=F 兩年日線 → (交易日, 收盤)，同中繼站 ?iv=1d"""
     b = yahoo("NQ=F", "1d", "2y")
     return [trade_day(t + 12 * 3600000) for t, *_ in b], [x[4] for x in b]
+
+def daily_paxg():
+    """幣安 PAXG 現貨日 K → (UTC 日期, 收盤)，同網頁 DAILYG（E 甲、F 甲）"""
+    k = jget("https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=1000")
+    return [datetime.fromtimestamp(int(x[0]) / 1000, timezone.utc).strftime("%Y-%m-%d") for x in k], [float(x[4]) for x in k]
+
+def daily_up_g(t, n, daily):
+    """同網頁 dailyUpG：只看這根之前已收完的 UTC 日 K（不偷看當天）"""
+    d, c = daily; td = datetime.fromtimestamp(t / 1000, timezone.utc).strftime("%Y-%m-%d")
+    j = bisect.bisect_left(d, td) - 1
+    if j < n - 1: return True
+    return c[j] / (sum(c[j - n + 1:j + 1]) / n) >= 1
+
+def fix_start(new, B, pos, warm):
+    """起算持有改成真正進場：從起算那根往回找部位開始的那根；暖機區內找不到才用起算價"""
+    if not new or new[0]["動作"] != "起算持有": return
+    s0 = next(i for i, b in enumerate(B) if b[0] == new[0]["時間戳"]); j = s0
+    while j > warm and pos[j - 1] == pos[s0]: j -= 1
+    if j > warm:
+        new[0].update({"時間": tpe(B[j][0]), "價格": f"{B[j][4]:g}", "時間戳": B[j][0], "備註": "7/15 起算時已有的部位；進場時間與價格為程式回算的真正進場"})
+    else:
+        new[0]["備註"] = "起算時已有的部位，往回找不到進場點，以起算時價格計"
 
 def daily_up(t, n, daily):
     d, c = daily; td = trade_day(t)
@@ -674,13 +702,19 @@ if __name__ == "__main__":
     added += update("C2", BC, posC2, wC2, act[1]); LAST["C2"] = LAST["C"]
 
     print("抓 D：Binance XAUUSDT 1 分 K")
-    BD = bars_D(min(last_t("D", START["D"]), NOW) - 70 * 86400000); posD, wD = calc_don(BD, 350, 8, "both", 8)
+    BD = bars_D(min(last_t("D", START["D"]), last_t("EG", START["EG"] - 150 * 86400000), NOW) - 70 * 86400000); posD, wD = calc_don(BD, 350, 8, "both", 8)
     added += update("D", BD, posD, wD, "XAUUSDT"); LAST["D"] = (BD[-1][4], BD[-1][0], None)
+    DG = daily_paxg()
+    posEG, wEG = calc_r7(BD, 350, 8, 1, 200, None, up_fn=lambda t: daily_up_g(t, 200, DG))
+    newEG = update("EG", BD, posEG, wEG, "XAUUSDT"); fix_start(newEG, BD, posEG, wEG); added += newEG; LAST["EG"] = LAST["D"]
 
     print("抓 E：Binance 現貨 PAXGUSDT 1 分 K")
-    BE = bars_E(min(last_t("E", START["E"]), NOW) - 70 * 86400000); posE, wE = calc_don_g(BE); posE = flat_short(posE)
+    BE = bars_E(min(last_t("E", START["E"]), last_t("FG", START["FG"] - 150 * 86400000), NOW) - 70 * 86400000); posE, wE = calc_don_g(BE)
+    posFG = [1 if p == 1 or daily_up_g(BE[i][0], 200, DG) else -1 for i, p in enumerate(posE)]
+    posE = flat_short(posE)
     added += switch_rule("E", BE, posE, "PAXGUSDT")
     added += update("E", BE, posE, wE, "PAXGUSDT"); LAST["E"] = (BE[-1][4], BE[-1][0], None)
+    newFG = update("FG", BE, posFG, wE, "PAXGUSDT"); fix_start(newFG, BE, posFG, wE); added += newFG; LAST["FG"] = LAST["E"]
 
     print("算 G、H、I：通用趨勢反手＋日線 60 日濾網")
     DAILY = daily_nq()
@@ -700,7 +734,7 @@ if __name__ == "__main__":
         posR7, wR7 = calc_r7(BC, lk, 6, 2.5, ma, DAILY7)
         added += update(k, BC, posR7, wR7, act[1]); LAST[k] = LAST["C"]
 
-    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG2, "G3": BG3, "O1": BG, "O2": BG, "GA": BG2, "J30": BG, "Y45": BG45, "J45": BG45, "DA": BC, "DB": BC, "DC": BC}
+    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG2, "G3": BG3, "O1": BG, "O2": BG, "GA": BG2, "J30": BG, "Y45": BG45, "J45": BG45, "DA": BC, "DB": BC, "DC": BC, "EG": BD, "FG": BE}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
