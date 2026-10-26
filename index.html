@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.29.1</title>
+<title>期貨趨勢 v1.29.2</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -226,7 +226,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.29.1";   // v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+const VERSION = "v1.29.2";   // v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
 //    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
@@ -425,7 +425,7 @@ function calcDon7(B, P){
     else if(r === 1){ if(le[i] != null && c < le[i]) r = -1; }
     else if(he[i] != null && c > he[i]) r = 1;
     raw[i] = r;
-    pos[i] = r === 1 || dailyUp(B[i].t, P.maLen) ? 1 : -1;
+    pos[i] = r === 1 || dailyUp(B[i].t, P.maLen, DAILY7) ? 1 : -1;
   }
   const all = [];
   for(let i = 1; i < n; i++) if(pos[i] !== pos[i-1]) all.push({i, d:pos[i]});
@@ -521,21 +521,28 @@ function tradeDay(t){   // 美東 18:00 之後算下一個交易日
   if(!v){ v = ETD.format(new Date(key * 3600000)); TDC.set(key, v); }
   return v;
 }
-function dailyUp(t, len){
-  if(!DAILY) return true;
+function dailyUp(t, len, D = DAILY){
+  if(!D) return true;
   const td = tradeDay(t);
-  let lo = 0, hi = DAILY.d.length - 1, j = -1;
-  while(lo <= hi){ const md = (lo + hi) >> 1; if(DAILY.d[md] < td){ j = md; lo = md + 1; } else hi = md - 1; }
+  let lo = 0, hi = D.d.length - 1, j = -1;
+  while(lo <= hi){ const md = (lo + hi) >> 1; if(D.d[md] < td){ j = md; lo = md + 1; } else hi = md - 1; }
   if(j < len - 1) return true;
-  let sum = 0; for(let k = j - len + 1; k <= j; k++) sum += DAILY.c[k];
-  return DAILY.c[j] / (sum / len) >= 1;
+  let sum = 0; for(let k = j - len + 1; k <= j; k++) sum += D.c[k];
+  return D.c[j] / (sum / len) >= 1;
 }
+/* v1.29.2 D 甲乙丙的日線改用跟 6 分 K 同一個單一月份合約（換月一起換）。連續月 NQ=F 沒有換月調整，150 日均線比 TV（依合約變更調整）
+   低約 370 點，10/23 TV 已翻空、網頁還抱多；單一月份合約 10/22 均線 29,197 對 TV 29,230，D 甲 10/23 06:00 @29,136 翻空與 TV 一字不差。
+   G、H、I 仍用連續月（DAILY）。 */
+let DAILY7 = null;
 async function loadDaily(){
-  const j = await jget(NQ_RELAY + "?iv=1d");
-  if(j.error) throw new Error(j.error);
   // Yahoo 日線時間戳在交易日當天（美東 00:00 前後），+18 小時落在同一交易日的 18:00 之前
-  DAILY = {d: j.bars.map(b => tradeDay(b[0] + 12 * 3600000)), c: j.bars.map(b => b[4])};
+  const toD = j => { if(j.error) throw new Error(j.error); return {d: j.bars.map(b => tradeDay(b[0] + 12 * 3600000)), c: j.bars.map(b => b[4])}; };
+  const [a, b] = await Promise.allSettled([jget(NQ_RELAY + "?iv=1d"), jget(NQ_RELAY + "?sym=" + encodeURIComponent(nqContract().sym) + "&iv=1d")]);
+  if(a.status === "fulfilled") DAILY = toD(a.value);
+  if(b.status === "fulfilled") DAILY7 = toD(b.value);
   PANELS.forEach(p => { if(p.kind === "atr" || p.r7) p.dirty = true; });
+  if(a.status === "rejected") throw a.reason;
+  if(b.status === "rejected") throw b.reason;
 }
 
 /* v1.8.0：使用者 2026-10-13 要求 C、E 格「空手改放空」——原規則（只做多）空手的時段一律持空、永遠在場。
@@ -1058,7 +1065,7 @@ function recompute(p){
   }
   p.bars = B;
   const done = B.slice(0, p.done);
-  if((p.kind === "atr" || p.r7) && !DAILY) return;
+  if((p.kind === "atr" && !DAILY) || (p.r7 && !DAILY7)) return;
   p.R = p.kind === "rf" ? calcRF(done, p.P) : p.kind === "atr" ? calcAtrRev(done, p.P) : p.r7 ? calcDon7(done, p.P) : p.goldExact ? calcDonG(done, p.P) : calcDon(done, p.P);
   if(p.flatShort) toFlatShort(p.R);
   p.ready = true;
@@ -1199,7 +1206,7 @@ function renderInfo(p){
     if(d > 0){ trigK = "翻空線"; trig = fmtP(p, R.ls[p.done - 1]); }
     else if(d < 0){ trigK = e.side < 0 ? "翻多線" : "翻多線（日線在均線上，不做空）"; trig = fmtP(p, R.ss[p.done - 1]); }
   }else if(p.r7){
-    const n = done.length, d = R.raw[n - 1], up = dailyUp(done[n - 1].t, p.P.maLen);
+    const n = done.length, d = R.raw[n - 1], up = dailyUp(done[n - 1].t, p.P.maLen, DAILY7);
     const hi = (m) => Math.max(...done.slice(n - m).map(b => b.h)), lo = (m) => Math.min(...done.slice(n - m).map(b => b.l));
     if(d > 0){ trigK = up ? "出場線（日線偏多，跌破不翻空）" : "翻空線"; trig = fmtP(p, lo(R.exitN)); }
     else if(d < 0){ trigK = e.side > 0 ? "翻多線（日線偏多，目前做多）" : "翻多線"; trig = fmtP(p, hi(R.exitN)); }

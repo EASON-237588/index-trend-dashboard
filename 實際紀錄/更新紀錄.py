@@ -693,8 +693,11 @@ if __name__ == "__main__":
     added += update("R2", BR2, posR2, wR2, act[1]); LAST["R2"] = (BR2[-1][4], BR2[-1][0], None)
 
     print("算 D 甲／乙／丙：出場線反手＋日線偏多（同 C 的 6 分 K）")
+    # 2026-10-26 v1.29.2：日線改用跟 6 分 K 同一個單一月份合約（同網頁 DAILY7）。連續月 NQ=F 沒換月調整，均線比 TV 低約 370 點，
+    # D 甲 10/23 TV 已翻空這裡還抱多；換成單一月份合約後 10/23 06:00 @29,136 翻空與 TV 一字不差
+    bd = yahoo(act[0], "1d", "2y"); DAILY7 = ([trade_day(t + 12 * 3600000) for t, *_ in bd], [x[4] for x in bd])
     for k, lk, ma in (("DA", 350, 150), ("DB", 350, 200), ("DC", 450, 200)):
-        posR7, wR7 = calc_r7(BC, lk, 6, 2.5, ma, DAILY)
+        posR7, wR7 = calc_r7(BC, lk, 6, 2.5, ma, DAILY7)
         added += update(k, BC, posR7, wR7, act[1]); LAST[k] = LAST["C"]
 
     BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG2, "G3": BG3, "O1": BG, "O2": BG, "GA": BG2, "J30": BG, "Y45": BG45, "J45": BG45, "DA": BC, "DB": BC, "DC": BC}
