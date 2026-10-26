@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.29.0</title>
+<title>期貨趨勢 v1.29.1</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -226,7 +226,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.29.0";   // v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+const VERSION = "v1.29.1";   // v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
 //    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
@@ -1605,7 +1605,8 @@ function applyLayout(){
 }
 function showPage(pg){
   if(!PANELS.some(p => p.pg === pg)) pg = "short";
-  if(MAXK && PAN(MAXK).pg !== pg){ MAXK = null; for(const p of PANELS){ const b = $("mx-" + p.k); b.textContent = "⤢"; b.title = "這一格放到最大"; } }
+  /* v1.29.1：電腦版 15 格同一頁、不分頁，放大的格子不屬於記住的分頁也不能取消（之前只有短趨勢那幾格放得大） */
+  if(MAXK && !document.body.classList.contains("lay-w") && PAN(MAXK).pg !== pg){ MAXK = null; for(const p of PANELS){ const b = $("mx-" + p.k); b.textContent = "⤢"; b.title = "這一格放到最大"; } }
   CURPG = pg;
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.pg === pg));
   /* 電腦版：不分頁，所有策略（觀察 G／H／I 除外）同時顯示；手機版照分頁。單格放大時只留那一格。 */
@@ -1778,9 +1779,10 @@ function setHoverT(t){
 }
 
 /* 同步顯示範圍（使用者 2026-10-23 要求）：那斯達克、台指、恆生各自一組，組內任一格縮放或拖曳，其他格顯示同一段時間。黃金不同步。
-   只在使用者動過圖之後才同步；格子的 K 棒週期不同（30 秒、37 秒、6 分…），所以用時間對齊、不用根數。 */
+   只在使用者動過圖之後才同步；格子的 K 棒週期不同（30 秒、37 秒、6 分…），所以用時間對齊、不用根數。
+   v1.29.1：那斯達克拆成秒級（只有 2～4 天資料）與 6 分（7/15 起約三個月）兩組，否則動一下短趨勢，中長趨勢就被壓成同一段兩三天、縮不回去。 */
 const SYNC_GROUP = {};
-for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","nq6","nq6b","nq7a","nq7b","nq7c","o2nq","o2nq37","j30","y45","j45"], tx:["tx30","tx37","tx22","o2tx"], hsi:["o2hsi"]}))
+for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","o2nq","o2nq37","j30","y45","j45"], nq6:["nq6","nq6b","nq7a","nq7b","nq7c"], tx:["tx30","tx37","tx22","o2tx"], hsi:["o2hsi"]}))
   for(const k of keys) SYNC_GROUP[k] = g;
 function syncView(p){
   const g = SYNC_GROUP[p.k];
