@@ -49,7 +49,10 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 7, 15), "D": ms(2026, 7, 15), "E": ms(2026, 7, 15),
          "R30": ms(2026, 10, 14), "R1": ms(2026, 10, 14), "R2": ms(2026, 10, 14), "C2": ms(2026, 7, 15), "G2": ms(2026, 10, 6), "G3": ms(2026, 10, 6),
          "O1": ms(2026, 10, 6), "O2": ms(2026, 10, 6), "GA": ms(2026, 10, 6),
-         "J30": ms(2026, 10, 6), "Y45": ms(2026, 10, 6), "J45": ms(2026, 10, 6)}
+         "J30": ms(2026, 10, 6), "Y45": ms(2026, 10, 6), "J45": ms(2026, 10, 6),
+         "DA": ms(2026, 7, 15), "DB": ms(2026, 7, 15), "DC": ms(2026, 7, 15)}
+# DA、DB、DC（畫面 D 甲／乙／丙，2026-10-26 使用者要求列入中長趨勢）：同 C 的 Yahoo 6 分 K，規則 7 出場線反手＋日線偏多、永遠在場內
+#   （TradingView「期貨趨勢D多空反手」，2008 起 181 組細掃的高原中心）。起算比照中長趨勢 7/15，10/26 以前是回算；換月時跟 C2 一樣還不會記換倉。
 # J30、Y45、J45（2026-10-25 使用者要求「前三名列入」）：GA 優化（TradingView 長樣本 30＋45 秒約 400 組）排名前三，
 #   甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7（37 秒甲＝450/28.5、乙＝700/30 換算過來）。Gate 逐筆合成，起算 10/6，10/25 以前是回算。
 # GA（2026-10-24 使用者要求「把 A 換成候選①」）：畫面 A 格改 Gate 逐筆合成 37 秒、Range Filter 300/23，起算 10/6，10/24 以前是回算。
@@ -63,12 +66,15 @@ START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B":
 # 10/15 以前是回算、不是當時實際記的。換月（12/11）時跟 R2 一樣還不會記換倉。
 # 2026-10-14 使用者要求 D、E 回溯拉到最大：XAUUSDT 2025/12/11 上市、PAXGUSDT 1 分 K 從 2020/08/28，各扣 350 小時暖機。
 # C 維持 8/15：單一月份合約的真 5 分 K 只有 60 天，更早只剩小時 K（9 月約已下市）。
-ORDER = ["GA", "J30", "Y45", "J45", "A", "G", "G2", "G3", "C", "C2", "D", "E", "R30", "R1", "R2", "O1", "O2"]
+ORDER = ["GA", "J30", "Y45", "J45", "A", "G", "G2", "G3", "C", "C2", "DA", "DB", "DC", "D", "E", "R30", "R1", "R2", "O1", "O2"]
 # LABEL 是畫面代號（v1.8.4 起照畫面順序叫 A～F），只用在印績效與曲線圖標題；紀錄檔「格子」欄仍是左邊的內部代號。
-LABEL = {"GA": "GA", "A": "A（舊，幣安）", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I", "C2": "D2", "G2": "B2", "G3": "B3", "O1": "觀察二", "O2": "觀察二", "J30": "甲30", "Y45": "乙45", "J45": "甲45"}
+LABEL = {"GA": "GA", "A": "A（舊，幣安）", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I", "C2": "D2", "G2": "B2", "G3": "B3", "O1": "觀察二", "O2": "觀察二", "J30": "甲30", "Y45": "乙45", "J45": "甲45", "DA": "D甲", "DB": "D乙", "DC": "D丙"}
 NAME = {"A": "那斯達克短趨勢（Binance 30 秒，取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢（Gate 30 秒，取樣 200、倍數 23）", "B": "那斯達克短趨勢（1 分，取樣 100、倍數 16）", "C": "那斯達克中長趨勢（6 分，空手放空）", "D": "黃金中長趨勢（8 分）", "E": "黃金中長趨勢（11 分，空手放空）",
         "R30": "那斯達克觀察（30 秒 ATR 反手 60/70＋日線 60）", "R1": "那斯達克觀察（1 分 ATR 反手 60/50＋日線 60）", "R2": "那斯達克觀察（2 分 ATR 反手 60/70＋日線 60）",
         "C2": "那斯達克觀察（6 分，通道 200 小時、停損 6 ATR，空手放空）",
+        "DA": "那斯達克中長趨勢（6 分出場線反手 350 小時、出場線 140 小時、日線 150 日偏多）",
+        "DB": "那斯達克中長趨勢（6 分出場線反手 350 小時、出場線 140 小時、日線 200 日偏多）",
+        "DC": "那斯達克中長趨勢（6 分出場線反手 450 小時、出場線 180 小時、日線 200 日偏多）",
         "G2": "那斯達克短趨勢（Gate 37 秒，取樣 450、倍數 23）",
         "G3": "那斯達克短趨勢（Gate 22 秒，取樣 50、倍數 45）",
         "GA": "那斯達克短趨勢（Gate 37 秒，取樣 300、倍數 23）",
@@ -355,6 +361,21 @@ def calc_don(B, lookH, tf, mode, stop_atr, atr_len=14):
         if not rev and d == 0 and side != 0: side = 0; avg = None
         if flip: side = d; avg = c
         pos[i] = side
+    return pos, look
+
+def calc_r7(B, lookH, tf, ex_div, ma_len, daily):
+    """D 甲乙丙：照 index.html 的 calcDon7（＝TradingView「期貨趨勢D多空反手」規則 7）。永遠在場內。
+    第一次用回看通道定方向，之後多單跌破出場線（回看÷ex_div）翻空、空單突破出場線翻多；前一日收盤在 ma_len 日均線以上時空單改做多。"""
+    n = len(B); look = min(4999, max(2, round(lookH * 60 / tf))); exn = max(10, round(look / ex_div))
+    H = [b[2] for b in B]; L = [b[3] for b in B]
+    hh, ll, he, le = roll(H, look, True), roll(L, look, False), roll(H, exn, True), roll(L, exn, False)
+    pos = [0] * n; r = 0
+    for i in range(n):
+        c = B[i][4]
+        if r == 0: r = 1 if hh[i] is not None and c > hh[i] else -1 if ll[i] is not None and c < ll[i] else 0
+        elif r == 1: r = -1 if le[i] is not None and c < le[i] else 1
+        else: r = 1 if he[i] is not None and c > he[i] else -1
+        pos[i] = 1 if r == 1 or daily_up(B[i][0], ma_len, daily) else -1
     return pos, look
 
 def calc_don_g(B, lookH=350, tf=11, stop_atr=8, atr_len=14):
@@ -671,7 +692,12 @@ if __name__ == "__main__":
     posR2, wR2 = calc_atr_rev(BR2, 60, 70, 60, DAILY)
     added += update("R2", BR2, posR2, wR2, act[1]); LAST["R2"] = (BR2[-1][4], BR2[-1][0], None)
 
-    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG2, "G3": BG3, "O1": BG, "O2": BG, "GA": BG2, "J30": BG, "Y45": BG45, "J45": BG45}
+    print("算 D 甲／乙／丙：出場線反手＋日線偏多（同 C 的 6 分 K）")
+    for k, lk, ma in (("DA", 350, 150), ("DB", 350, 200), ("DC", 450, 200)):
+        posR7, wR7 = calc_r7(BC, lk, 6, 2.5, ma, DAILY)
+        added += update(k, BC, posR7, wR7, act[1]); LAST[k] = LAST["C"]
+
+    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG2, "G3": BG3, "O1": BG, "O2": BG, "GA": BG2, "J30": BG, "Y45": BG45, "J45": BG45, "DA": BC, "DB": BC, "DC": BC}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)

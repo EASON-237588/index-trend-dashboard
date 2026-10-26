@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.28.1</title>
+<title>期貨趨勢 v1.29.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -177,9 +177,9 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 /* v1.25.0 電腦版排版（使用者 2026-10-23 決定：手機版與電腦版同一份程式，依螢幕寬度自動切，也可手動選）。
    電腦版＝這一頁的格子並排、自動換行，可上下捲動；規則、資料、交易明細完全不動。 */
 .lay-w .app{max-width:none}
-/* 電腦版：指定的 12 格同一頁、不捲動、不翻頁，四欄三列（v1.27.0 由三欄改四欄，第 4 欄放 GA 優化前三名），每格一樣大；分頁列隱藏 */
+/* 電腦版：指定的 15 格同一頁、不捲動、不翻頁，五欄三列（v1.27.0 由三欄改四欄，第 4 欄放 GA 優化前三名；v1.29.0 改五欄，第 5 欄放 D 甲乙丙），每格一樣大；分頁列隱藏 */
 .lay-w #tabs{display:none}
-.lay-w .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;padding:0 8px 8px;overflow:hidden}
+.lay-w .grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;padding:4px 8px 8px;overflow:hidden}
 .lay-w .panel{flex:none;height:auto;min-height:0}
 /* v1.27.0 四欄後每格變窄：標題列縮字、組合名稱放不下時用「…」收尾，現價固定在最右邊不溢出到隔壁格 */
 .lay-w .ph{gap:4px;overflow:hidden;min-width:0}
@@ -190,6 +190,11 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 .lay-w .px{font-size:13px;flex:none}
 .lay-w .px small{font-size:10.5px;margin-left:4px}
 .lay-w .grid.mx{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+/* v1.29.0 電腦版五個小組的藍色外框：疊在格子上、往外推 3px 落在 6px 間隙裡，不擋滑鼠；單格放大與手機版不畫 */
+.grp{display:none}
+.lay-w .grp{display:block;margin:-3px;border:3px solid #00c8ff;border-radius:9px;pointer-events:none;z-index:3;animation:grpBlink 2.4s ease-in-out infinite}
+.lay-w .grid.mx .grp{display:none}
+@keyframes grpBlink{0%,100%{opacity:1}50%{opacity:.3}}
 </style>
 </head>
 <body>
@@ -221,7 +226,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.28.1";   // v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+const VERSION = "v1.29.0";   // v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
 //    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
@@ -403,6 +408,29 @@ function calcDon(B, P){
   }
   return {pos, avg:avgA, atr, look, exitN, hh, ll, all: sigs, sigs: sigs.filter(s => s.i >= look), warm: look};
 }
+/* v1.29.0 D 甲／乙／丙（使用者 2026-10-26 要求列入中長趨勢）：照 TradingView「期貨趨勢D多空反手」規則 7（出場線反手＋日線偏多），永遠在場內。
+   第一次用回看通道決定方向（突破前 N 小時高點做多、跌破低點做空），之後多單跌破出場線（回看÷比例）翻空、空單突破出場線翻多；
+   前一個已收盤交易日的 NQ 收盤 ≥ 均線時，空單改做多。TV NQ1! 6 分 2008 起 181 組：出場線 113～180 小時 × 均線 150～250 天是高原。 */
+function calcDon7(B, P){
+  const n = B.length;
+  const look = Math.min(4999, Math.max(2, Math.round(P.lookH * 60 / P.tfMin)));
+  const exitN = Math.max(10, Math.round(look / P.exDiv));
+  const H = B.map(b => b.h), L = B.map(b => b.l);
+  const hh = rollMax(H, look), ll = rollMin(L, look), he = rollMax(H, exitN), le = rollMin(L, exitN);
+  const pos = new Array(n).fill(0), raw = new Array(n).fill(0);
+  let r = 0;
+  for(let i = 0; i < n; i++){
+    const c = B[i].c;
+    if(r === 0) r = hh[i] != null && c > hh[i] ? 1 : ll[i] != null && c < ll[i] ? -1 : 0;
+    else if(r === 1){ if(le[i] != null && c < le[i]) r = -1; }
+    else if(he[i] != null && c > he[i]) r = 1;
+    raw[i] = r;
+    pos[i] = r === 1 || dailyUp(B[i].t, P.maLen) ? 1 : -1;
+  }
+  const all = [];
+  for(let i = 1; i < n; i++) if(pos[i] !== pos[i-1]) all.push({i, d:pos[i]});
+  return {pos, raw, look, exitN, hh, ll, all, sigs: all.filter(s => s.i >= look), warm: look};
+}
 /* v1.5.0：黃金上方策略專用，逐行對齊黃金儀表板 compute()（1 段、只做多）與 LINE 推播 donchian.js。
    跟上面 calcDon 有兩處不同，所以不共用：
    1. 停損後不把方向歸零，而是封鎖同方向，要先跌破出場線（方向離開多方）才接受下一次突破
@@ -507,7 +535,7 @@ async function loadDaily(){
   if(j.error) throw new Error(j.error);
   // Yahoo 日線時間戳在交易日當天（美東 00:00 前後），+18 小時落在同一交易日的 18:00 之前
   DAILY = {d: j.bars.map(b => tradeDay(b[0] + 12 * 3600000)), c: j.bars.map(b => b[4])};
-  PANELS.forEach(p => { if(p.kind === "atr") p.dirty = true; });
+  PANELS.forEach(p => { if(p.kind === "atr" || p.r7) p.dirty = true; });
 }
 
 /* v1.8.0：使用者 2026-10-13 要求 C、E 格「空手改放空」——原規則（只做多）空手的時段一律持空、永遠在場。
@@ -595,6 +623,20 @@ const PANELS = [
    spec:{tf:"6 分", par:"Donchian 回看 200 小時・停損 6 ATR・空手改放空", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
    sub:"NQ 期貨單一月份合約 6 分（同 D）・Donchian 回看 200 小時（2,000 根）・停損 6 ATR・空手改放空（不擋）",
    P:{lookH:200, mode:"long", stopAtr:6, atrLen:14, tfMin:6}},
+  /* v1.29.0 D 甲／乙／丙：同 D 的資料（Yahoo NQ 單一月份 6 分），規則 7 出場線反手＋日線偏多、永遠在場內（calcDon7）。
+     TV NQ1! 6 分 2008 起（1 口微型扣成本）：甲 +120.6 萬／回落 −28.8、乙 +99.7／−29.7、丙 +96.2／−29.0，四段都賺，獲利偏重 2022 以後。 */
+  {k:"nq7a", pg:"long", title:"那斯達克", tf:"中長趨勢・D 甲", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", r7:true, tfMin:6, span:1e9, flatCol:"#4cff00",
+   spec:{tf:"6 分", par:"出場線反手 350 小時・出場線 140 小時・日線 150 日均線之上空單改做多", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
+   sub:"NQ 期貨單一月份合約 6 分（同 D）・出場線反手：首次用 350 小時通道定方向，之後破 140 小時出場線反手・日線 150 日均線之上空單改做多・永遠在場內",
+   P:{lookH:350, exDiv:2.5, maLen:150, tfMin:6}},
+  {k:"nq7b", pg:"long", title:"那斯達克", tf:"中長趨勢・D 乙", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", r7:true, tfMin:6, span:1e9, flatCol:"#4cff00",
+   spec:{tf:"6 分", par:"出場線反手 350 小時・出場線 140 小時・日線 200 日均線之上空單改做多", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
+   sub:"NQ 期貨單一月份合約 6 分（同 D）・出場線反手：首次用 350 小時通道定方向，之後破 140 小時出場線反手・日線 200 日均線之上空單改做多・永遠在場內",
+   P:{lookH:350, exDiv:2.5, maLen:200, tfMin:6}},
+  {k:"nq7c", pg:"long", title:"那斯達克", tf:"中長趨勢・D 丙", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", r7:true, tfMin:6, span:1e9, flatCol:"#4cff00",
+   spec:{tf:"6 分", par:"出場線反手 450 小時・出場線 180 小時・日線 200 日均線之上空單改做多", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
+   sub:"NQ 期貨單一月份合約 6 分（同 D）・出場線反手：首次用 450 小時通道定方向，之後破 180 小時出場線反手・日線 200 日均線之上空單改做多・永遠在場內",
+   P:{lookH:450, exDiv:2.5, maLen:200, tfMin:6}},
   {k:"gold8", pg:"long", title:"黃金", tf:"中長趨勢・E", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
    spec:{tf:"8 分", par:"Donchian 回看 350 小時・多空反轉・永遠在場", src:"Binance XAUUSDT"},
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
@@ -1016,8 +1058,8 @@ function recompute(p){
   }
   p.bars = B;
   const done = B.slice(0, p.done);
-  if(p.kind === "atr" && !DAILY) return;
-  p.R = p.kind === "rf" ? calcRF(done, p.P) : p.kind === "atr" ? calcAtrRev(done, p.P) : p.goldExact ? calcDonG(done, p.P) : calcDon(done, p.P);
+  if((p.kind === "atr" || p.r7) && !DAILY) return;
+  p.R = p.kind === "rf" ? calcRF(done, p.P) : p.kind === "atr" ? calcAtrRev(done, p.P) : p.r7 ? calcDon7(done, p.P) : p.goldExact ? calcDonG(done, p.P) : calcDon(done, p.P);
   if(p.flatShort) toFlatShort(p.R);
   p.ready = true;
   $("wait-" + p.k).hidden = true;
@@ -1041,7 +1083,7 @@ function buildDOM(){
       <div class="tip" id="tip-${p.k}"></div>
       <div class="wait" id="wait-${p.k}">${p.waitMsg || "載入中…"}</div>
     </div>
-  </section>`).join("");
+  </section>`).join("") + GRP_AREAS.map(a => `<div class="grp" style="grid-area:${a}"></div>`).join("");
   $("tradeTabs").innerHTML = `<button data-k="SUM">績效表</button>` +   // v1.20.0
     TRADE_K.map(T => `<button data-k="${T.k}"${T.blink?" data-blink":""}${T.red?" data-red":""}>${T.name}</button>`).join("");
   $("tradeTabs").onclick = e => {
@@ -1116,7 +1158,7 @@ function totalHtml(p){
 }
 /* v1.26.0：所有閃爍（外框、紅字標題、明細按鈕、即時燈號，都是 2.4 秒；同日使用者嫌刺眼由 1.2 秒放慢、外框暗時留 35%）起點對齊同一個時間原點，畫面上一起亮一起暗（使用者 2026-10-24 要求）。
    動畫是各自加上樣式那一刻才起跑，不對齊就會錯開；每秒補一次，新出現的閃爍也會對齊。 */
-const BLINKS = new Set(["blink", "blinkName", "frLong", "frShort", "pushIn"]);
+const BLINKS = new Set(["blink", "blinkName", "frLong", "frShort", "pushIn", "grpBlink"]);
 function syncBlink(){
   if(!document.getAnimations) return;
   for(const a of document.getAnimations()) if(BLINKS.has(a.animationName) && a.startTime !== 0) a.startTime = 0;
@@ -1156,6 +1198,12 @@ function renderInfo(p){
     const d = R.raw[p.done - 1];
     if(d > 0){ trigK = "翻空線"; trig = fmtP(p, R.ls[p.done - 1]); }
     else if(d < 0){ trigK = e.side < 0 ? "翻多線" : "翻多線（日線在均線上，不做空）"; trig = fmtP(p, R.ss[p.done - 1]); }
+  }else if(p.r7){
+    const n = done.length, d = R.raw[n - 1], up = dailyUp(done[n - 1].t, p.P.maLen);
+    const hi = (m) => Math.max(...done.slice(n - m).map(b => b.h)), lo = (m) => Math.min(...done.slice(n - m).map(b => b.l));
+    if(d > 0){ trigK = up ? "出場線（日線偏多，跌破不翻空）" : "翻空線"; trig = fmtP(p, lo(R.exitN)); }
+    else if(d < 0){ trigK = e.side > 0 ? "翻多線（日線偏多，目前做多）" : "翻多線"; trig = fmtP(p, hi(R.exitN)); }
+    else { trigK = "突破／跌破"; trig = fmtP(p, hi(R.look)) + "／" + fmtP(p, lo(R.look)); }
   }else{
     const look = R.look, exitN = R.exitN, n = done.length;
     const hi = (m) => Math.max(...done.slice(n - m).map(b => b.h));
@@ -1210,6 +1258,9 @@ const TRADE_K = [
   {k:"G3", pk:"gate3", name:"B3",   unit:"點"},   // v1.10.0 新增 22 秒 50/45；C 格（Hyperliquid）同版刪除
   {k:"C", pk:"nq6",    name:"D",    unit:"點"},
   {k:"C2", pk:"nq6b",  name:"D2",   unit:"點", red:true},   // v1.23.4 紅字閃爍   // 2026-10-15 放在 D 正下方，同 D 資料、200/6 多空都做
+  {k:"DA", pk:"nq7a",  name:"D 甲", unit:"點"},   // v1.29.0 規則 7 出場線反手＋日線偏多，紀錄代號 DA／DB／DC，7/15 起算（10/26 以前是回算）
+  {k:"DB", pk:"nq7b",  name:"D 乙", unit:"點"},
+  {k:"DC", pk:"nq7c",  name:"D 丙", unit:"點"},
   {k:"D", pk:"gold8",  name:"E 黃金", unit:"美元", d:2},
   {k:"E", pk:"gold11", name:"F 黃金", unit:"美元", d:2},
   // v1.11.0 台指三組：沒有正式紀錄檔，從 10/6 起整段用格子自己算的部位（self）
@@ -1424,6 +1475,7 @@ const SUM_NAME = {
   GA:"那斯達克・GA（37 秒 300/23）", J30:"那斯達克・甲（30 秒 555/31.9，第1名）", Y45:"那斯達克・乙（45 秒 576/27，第2名）", J45:"那斯達克・甲（45 秒 370/25.7，第3名）",
   A:"那斯達克・舊 A（幣安 30 秒）", G:"那斯達克・B（30 秒）", G2:"那斯達克・B2（37 秒）", G3:"那斯達克・B3（22 秒）",
   C:"那斯達克・D（6 分）", C2:"那斯達克・D2（6 分）", D:"黃金・E（8 分）", E:"黃金・F（11 分）",
+  DA:"那斯達克・D 甲（6 分 350 時／均線 150）", DB:"那斯達克・D 乙（6 分 350 時／均線 200）", DC:"那斯達克・D 丙（6 分 450 時／均線 200）",
   TX1:"台指・A/B", TX2:"台指・B2", TX3:"台指・B3", TX4:"台指・觀察二 台指",
   O1:"那斯達克・觀察二 555/23", O2:"那斯達克・觀察二 37/37", HSI:"恆生・觀察二 恆生",
   R30:"那斯達克・G（30 秒，Gate）", R1:"那斯達克・H（1 分）", R2:"那斯達克・I（2 分）",
@@ -1538,8 +1590,12 @@ document.addEventListener("keydown", e => { if(e.key === "Escape" && MAXK) setMa
 /* v1.25.0 排版：手機版（分頁單欄）或電腦版（15 格同一頁）。自動＝螢幕寬 1280px 以上用電腦版；手動選的存在這台瀏覽器。 */
 const LAY_KEY = "itd-layout", LAY_NEXT = {auto:"m", m:"w", w:"auto"}, LAY_TXT = {auto:"自動", m:"手機", w:"電腦"};
 /* 電腦版保留的 12 格與位置（列, 欄）：第 1 列 A、B2、那斯達克觀察二 555/23；第 2 列 D2、台指 B2、台指觀察二；第 3 列 黃金 F、黃金 E、恆生觀察二；
-   v1.27.0 第 4 欄由上而下 GA 優化第 1～3 名（甲 30 秒、乙 45 秒、甲 45 秒） */
-const BOARD_AT = {rf:[1,1], gate2:[1,2], o2nq:[1,3], j30:[1,4], nq6b:[2,1], tx37:[2,2], o2tx:[2,3], y45:[2,4], gold11:[3,1], gold8:[3,2], o2hsi:[3,3], j45:[3,4]};
+   v1.27.0 第 4 欄由上而下 GA 優化第 1～3 名（甲 30 秒、乙 45 秒、甲 45 秒）。
+   v1.29.0 使用者 2026-10-26 依商品分組重排（5 欄 × 3 列）：左 6 格那斯達克短趨勢、中上 4 格那斯達克中長趨勢、中下 2 格台指、
+   右上 2 格黃金、右下 1 格恆生；每個小組外面一圈藍色閃爍框（GRP_AREAS，畫在格子間隙上）。 */
+const BOARD_AT = {rf:[1,1], gate2:[1,2], o2nq:[2,1], j30:[2,2], y45:[3,1], j45:[3,2],
+  nq6b:[1,3], nq7a:[1,4], nq7b:[2,3], nq7c:[2,4], tx37:[3,3], o2tx:[3,4], gold11:[1,5], gold8:[2,5], o2hsi:[3,5]};
+const GRP_AREAS = ["1 / 1 / 4 / 3", "1 / 3 / 3 / 5", "3 / 3 / 4 / 5", "1 / 5 / 3 / 6", "3 / 5 / 4 / 6"];   // 列起／欄起／列止／欄止
 function layMode(){ try{ return localStorage.getItem(LAY_KEY) || "auto"; }catch(e){ return "auto"; } }
 function applyLayout(){
   const mode = layMode(), wide = mode === "w" || (mode === "auto" && window.innerWidth >= 1280);
@@ -1724,7 +1780,7 @@ function setHoverT(t){
 /* 同步顯示範圍（使用者 2026-10-23 要求）：那斯達克、台指、恆生各自一組，組內任一格縮放或拖曳，其他格顯示同一段時間。黃金不同步。
    只在使用者動過圖之後才同步；格子的 K 棒週期不同（30 秒、37 秒、6 分…），所以用時間對齊、不用根數。 */
 const SYNC_GROUP = {};
-for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","nq6","nq6b","o2nq","o2nq37","j30","y45","j45"], tx:["tx30","tx37","tx22","o2tx"], hsi:["o2hsi"]}))
+for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","nq6","nq6b","nq7a","nq7b","nq7c","o2nq","o2nq37","j30","y45","j45"], tx:["tx30","tx37","tx22","o2tx"], hsi:["o2hsi"]}))
   for(const k of keys) SYNC_GROUP[k] = g;
 function syncView(p){
   const g = SYNC_GROUP[p.k];
@@ -1798,13 +1854,24 @@ const NQ_CONTRACTS = [
 ];
 let YCUT = 0;
 const nqContract = () => NQ_CONTRACTS.filter(c => c.from <= Date.now()).pop();
+/* v1.29.0：中繼站改成直接轉 Yahoo 原始回應（?raw=5m／2m），5 分＋2 分的解析合併搬到網頁做，算法同中繼站舊版：
+   2 分 K 涵蓋不到的前段用 5 分 K 補。原因：資料變大後中繼站解析超過 Cloudflare 免費 CPU 上限，每次回 503（錯誤碼 1102）。 */
+function yParse(j){
+  const d = j.chart.result[0], q = d.indicators.quote[0], out = [];
+  d.timestamp.forEach((t, i) => {
+    const o = q.open[i], h = q.high[i], l = q.low[i], c = q.close[i];
+    if(o != null && h != null && l != null && c != null) out.push({t:t * 1000, o, h, l, c, v:0});
+  });
+  return out;
+}
 async function loadYahoo(p){
-  const c = nqContract();
-  const j = await jget(NQ_RELAY + "?sym=" + encodeURIComponent(c.sym));
+  const c = nqContract(), base = NQ_RELAY + "?sym=" + encodeURIComponent(c.sym) + "&raw=";
+  const [j5, j2] = await Promise.all([jget(base + "5m"), jget(base + "2m")]);
   p.contract = c;
-  if(j.error) throw new Error(j.error);
-  RAW1M[p.sym] = j.bars.map(b => ({t:b[0], o:b[1], h:b[2], l:b[3], c:b[4], v:0}));
-  YCUT = j.cut || 0;
+  if(j5.error || j2.error) throw new Error(j5.error || j2.error);
+  const m5 = yParse(j5), m2 = yParse(j2), cut = m2.length ? m2[0].t : Infinity;
+  RAW1M[p.sym] = m5.filter(b => b.t < cut).concat(m2);
+  YCUT = isFinite(cut) ? cut : 0;
   PANELS.forEach(x => { if(x.sym === p.sym) x.dirty = true; });
 }
 /* Hyperliquid 1 分 K：一次最多給約 5,000 根（3.5 天），暖機 600 根綽綽有餘。
@@ -2273,7 +2340,7 @@ async function main(){
       pollTXL().catch(() => {}),
       loadTXH().catch(() => {}),   // v1.23.1 台指 10/06 起的舊段（沒有檔就略過）
       pollHSI().catch(e => { HSI.err = "恆生資料讀取失敗：" + e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }),   // v1.19.0   // 即時 K 拿不到時照舊只顯示盤後資料
-      loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
+      loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2", "nq7a", "nq7b", "nq7c"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
     ]);
   }catch(e){
     for(const k of ["nq6", "gold8"]) $("wait-" + k).textContent = "歷史資料載入失敗：" + e.message + "，請重新整理";

@@ -33,6 +33,25 @@ export default {
     const q = url.searchParams.get("sym");
     if(q && !SYM_OK.test(q)) return new Response("bad sym", {status: 400, headers: cors(origin)});
     const sym = q || SYM;
+    /* v1.29.0：?raw=5m／2m 直接轉 Yahoo 原始回應、不解析（2026-10-26 起 5 分＋2 分 60 天約 1.8 MB、3.9 萬根，
+       解析合併超過免費方案 CPU 上限，每次回 503 錯誤碼 1102）。合併改在網頁做，算法同下面 m5／m2 那段。 */
+    const raw = url.searchParams.get("raw");
+    if(raw){
+      if(raw !== "5m" && raw !== "2m") return new Response("bad raw", {status: 400, headers: cors(origin)});
+      const key = new Request(url.origin + "/nq?sym=" + sym + "&raw=" + raw);
+      let res = await caches.default.match(key);
+      if(!res){
+        const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=${raw}&range=60d&includePrePost=true`,
+          {headers: {"User-Agent": "Mozilla/5.0"}});
+        if(!r.ok) return new Response(JSON.stringify({error: `Yahoo ${raw} HTTP ${r.status}`}), {status: 502,
+          headers: Object.assign({"Content-Type": "application/json"}, cors(origin))});
+        res = new Response(r.body, {headers: {"Content-Type": "application/json", "Cache-Control": `public, max-age=${TTL}`}});
+        ctx.waitUntil(caches.default.put(key, res.clone()));
+      }
+      const out = new Response(res.body, res);
+      for(const [k, v] of Object.entries(cors(origin))) out.headers.set(k, v);
+      return out;
+    }
     // v1.9.0：?iv=1d 回傳日線（給 G、H、I 格的日線 60 日均線濾網），快取 30 分鐘
     const daily = url.searchParams.get("iv") === "1d";
 
