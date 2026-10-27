@@ -49,7 +49,7 @@ def ms(y, m, d, h=0):  # 台北時間 → 毫秒
 START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B": ms(2026, 10, 8), "C": ms(2026, 7, 15), "D": ms(2026, 7, 15), "E": ms(2026, 7, 15),
          "R30": ms(2026, 10, 14), "R1": ms(2026, 10, 14), "R2": ms(2026, 10, 14), "C2": ms(2026, 7, 15), "G2": ms(2026, 10, 6), "G3": ms(2026, 10, 6),
          "O1": ms(2026, 10, 6), "O2": ms(2026, 10, 6), "GA": ms(2026, 10, 6),
-         "J30": ms(2026, 10, 6), "Y45": ms(2026, 10, 6), "J45": ms(2026, 10, 6),
+         "J30": ms(2026, 10, 6), "Y45": ms(2026, 10, 6), "J45": ms(2026, 10, 6), "BAL": ms(2026, 10, 6),
          "DA": ms(2026, 7, 15), "DB": ms(2026, 7, 15), "DC": ms(2026, 7, 15),
          "EG": ms(2026, 7, 15), "FG": ms(2026, 7, 15)}
 # EG、FG（畫面 E 甲／F 甲，2026-10-26 使用者要求加上去）：E、F 加幣安 PAXG 日線 200 日偏多、永遠在場內。EG＝E 的 8 分 K 通道反手，
@@ -70,9 +70,9 @@ START = {"A": ms(2026, 10, 6), "A2": ms(2026, 10, 6), "G": ms(2026, 10, 6), "B":
 # 10/15 以前是回算、不是當時實際記的。換月（12/11）時跟 R2 一樣還不會記換倉。
 # 2026-10-14 使用者要求 D、E 回溯拉到最大：XAUUSDT 2025/12/11 上市、PAXGUSDT 1 分 K 從 2020/08/28，各扣 350 小時暖機。
 # C 維持 8/15：單一月份合約的真 5 分 K 只有 60 天，更早只剩小時 K（9 月約已下市）。
-ORDER = ["GA", "J30", "Y45", "J45", "A", "G", "G2", "G3", "C", "C2", "DA", "DB", "DC", "D", "E", "EG", "FG", "R30", "R1", "R2", "O1", "O2"]
+ORDER = ["GA", "J30", "Y45", "J45", "BAL", "A","G", "G2", "G3", "C", "C2", "DA", "DB", "DC", "D", "E", "EG", "FG", "R30", "R1", "R2", "O1", "O2"]
 # LABEL 是畫面代號（v1.8.4 起照畫面順序叫 A～F），只用在印績效與曲線圖標題；紀錄檔「格子」欄仍是左邊的內部代號。
-LABEL = {"GA": "GA", "A": "A（舊，幣安）", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I", "C2": "D2", "G2": "B2", "G3": "B3", "O1": "觀察二", "O2": "觀察二", "J30": "甲30", "Y45": "乙45", "J45": "甲45", "DA": "D甲", "DB": "D乙", "DC": "D丙", "EG": "E甲", "FG": "F甲"}
+LABEL = {"GA": "GA", "A": "A（舊，幣安）", "A2": "A-2", "G": "B", "B": "C", "C": "D", "D": "E", "E": "F", "R30": "G", "R1": "H", "R2": "I", "C2": "D2", "G2": "B2", "G3": "B3", "O1": "觀察二", "O2": "觀察二", "J30": "甲30", "Y45": "乙45", "J45": "甲45", "BAL": "平衡板", "DA": "D甲", "DB": "D乙", "DC": "D丙", "EG": "E甲", "FG": "F甲"}
 NAME = {"A": "那斯達克短趨勢（Binance 30 秒，取樣 200、倍數 23）", "A2": "那斯達克短趨勢（取樣 400、倍數 16）", "G": "那斯達克短趨勢（Gate 30 秒，取樣 200、倍數 23）", "B": "那斯達克短趨勢（1 分，取樣 100、倍數 16）", "C": "那斯達克中長趨勢（6 分，空手放空）", "D": "黃金中長趨勢（8 分）", "E": "黃金中長趨勢（11 分，空手放空）",
         "R30": "那斯達克觀察（30 秒 ATR 反手 60/70＋日線 60）", "R1": "那斯達克觀察（1 分 ATR 反手 60/50＋日線 60）", "R2": "那斯達克觀察（2 分 ATR 反手 60/70＋日線 60）",
         "C2": "那斯達克觀察（6 分，通道 200 小時、停損 6 ATR，空手放空）",
@@ -86,7 +86,8 @@ NAME = {"A": "那斯達克短趨勢（Binance 30 秒，取樣 200、倍數 23）
         "GA": "那斯達克短趨勢（Gate 37 秒，取樣 300、倍數 23）",
         "O1": "那斯達克（Gate 30 秒，取樣 555、倍數 23）", "O2": "那斯達克（Gate 30 秒，取樣 37、倍數 37）",
         "J30": "那斯達克前三名・甲（Gate 30 秒，取樣 555、倍數 31.9）", "Y45": "那斯達克前三名・乙（Gate 45 秒，取樣 576、倍數 27）",
-        "J45": "那斯達克前三名・甲（Gate 45 秒，取樣 370、倍數 25.7）"}
+        "J45": "那斯達克前三名・甲（Gate 45 秒，取樣 370、倍數 25.7）",
+        "BAL": "那斯達克平衡板（甲 30 秒與乙 45 秒同向才持有，分歧或任一空手就空手）"}
 GOLD = ("D", "E", "EG", "FG")   # 單位是美元/盎司
 
 # C 格合約與換月日（CME 慣例：到期前約一週的週四換到下一季）。過了最後一列要往下加
@@ -653,7 +654,7 @@ if __name__ == "__main__":
     # B2 暖機約 2,700 根（約 28 個交易小時），第一次從起算日往前多抓 5 天（中間有週末休市）
     gsince = min(last_t("G", START["G"]), last_t("G2", START["G2"] - 2 * 86400000), last_t("G3", START["G3"] - 2 * 86400000),
                  last_t("O1", START["O1"] - 2 * 86400000), last_t("O2", START["O2"] - 2 * 86400000), last_t("GA", START["GA"] - 2 * 86400000),
-                 last_t("J30", START["J30"] - 2 * 86400000), last_t("Y45", START["Y45"] - 3 * 86400000), last_t("J45", START["J45"] - 2 * 86400000), NOW) - 3 * 86400000
+                 last_t("J30", START["J30"] - 2 * 86400000), last_t("Y45", START["Y45"] - 3 * 86400000), last_t("J45", START["J45"] - 2 * 86400000), last_t("BAL", START["BAL"] - 5 * 86400000), NOW) - 3 * 86400000
     GTR = gate_trades(gsince)
     BG = bars_G(gsince, 30, GTR); posG, wG = calc_rf(BG, 200, 23)
     added += update("G", BG, posG, wG, "QQQ_USDT", nqconv)
@@ -674,6 +675,20 @@ if __name__ == "__main__":
     added += update("Y45", BG45, posY45, wY45, "QQQ_USDT", nqconv); LAST["Y45"] = LAST45
     posJ45, wJ45 = calc_rf(BG45, 370, 25.7)
     added += update("J45", BG45, posJ45, wJ45, "QQQ_USDT", nqconv); LAST["J45"] = LAST45
+    # 平衡板（2026-10-27 使用者定案）：甲 30 秒與乙 45 秒同向才持有，分歧或任一空手就空手。
+    # 時間軸用 30 秒 K；乙的部位只用收盤已完成的那根 45 秒 K（起點＋45 秒 ≤ 30 秒 K 收盤），不偷看。
+    # 暖機以兩邊都暖機完成為準：乙的暖機結束時間之後才開始算。
+    import bisect
+    ends45 = [b[0] + 45000 for b in BG45]
+    posBAL = []
+    for i, b in enumerate(BG):
+        a = posJ30[i]
+        k = bisect.bisect_right(ends45, b[0] + 30000) - 1
+        c = posY45[k] if k >= 0 else 0
+        posBAL.append(a if a == c else 0)
+    warmT45 = BG45[wY45][0] if wY45 < len(BG45) else float("inf")   # 乙的暖機結束時間；抓的資料不夠長就整段不算
+    warmBAL = next((i for i, b in enumerate(BG) if b[0] >= warmT45), len(BG))
+    added += update("BAL", BG, posBAL, max(wJ30, warmBAL), "QQQ_USDT", nqconv); LAST["BAL"] = LAST["J30"]
     BG3 = bars_G(gsince, 22, GTR); posG3, wG3 = calc_rf(BG3, 50, 45)
     added += update("G3", BG3, posG3, wG3, "QQQ_USDT", nqconv); LAST["G3"] = (BG3[-1][4], BG3[-1][0], nqconv(BG3[-1][0], BG3[-1][4]))
 
@@ -734,7 +749,7 @@ if __name__ == "__main__":
         posR7, wR7 = calc_r7(BC, lk, 6, 2.5, ma, DAILY7)
         added += update(k, BC, posR7, wR7, act[1]); LAST[k] = LAST["C"]
 
-    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG2, "G3": BG3, "O1": BG, "O2": BG, "GA": BG2, "J30": BG, "Y45": BG45, "J45": BG45, "DA": BC, "DB": BC, "DC": BC, "EG": BD, "FG": BE}
+    BARS = {"A": BA, "G": BG, "B": BB, "C": BC, "D": BD, "E": BE, "R30": BA, "R1": BB, "R2": BR2, "C2": BC, "G2": BG2, "G3": BG3, "O1": BG, "O2": BG, "GA": BG2, "J30": BG, "Y45": BG45, "J45": BG45, "BAL": BG, "DA": BC, "DB": BC, "DC": BC, "EG": BD, "FG": BE}
     allrows = [r for r in LOG_ROWS if r not in added] + added
     allrows.sort(key=lambda r: (r["格子"], int(r["時間戳"])))
     save_log(allrows)
