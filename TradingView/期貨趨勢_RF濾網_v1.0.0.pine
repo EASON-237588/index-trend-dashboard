@@ -1,0 +1,65 @@
+// 期貨趨勢・RF 濾網版 v1.0.0（2026-10-28 HP 建立，使用者要求「TV 的 GA 嚴格優化、加結構濾網」）
+// 以 期貨趨勢_RangeFilter_v1.1.0 為底，前 9 個輸入與 Range Filter 算法一字不改，後面加兩道濾網：
+//   日線濾網 regMode：0 不用；1 前一日日線收盤在均線上時不做空（空訊號改續抱多，照 D 甲規則 7 的做法）；
+//                     2 前一日日線收盤在均線下時不做多（1 的鏡像，對照用）。
+//     日線一律用「前一天」的收盤與均線（request.security 取 [1]＋lookahead_on），不偷看當天。
+//   數據時段 skipMin：美東 8:30 起這幾分鐘內不換方向；時段過了訊號還在才換（擋 10/14 那種一分鐘來回）。
+// 永遠在場內：第一筆照原版等第一次翻轉才進場，之後部位一律跟「想要的方向」，只有換方向、沒有空手。
+// 兩道濾網都關（regMode 0、skipMin 0）時，進出點與原版完全相同。
+// 屬性：MNQ1! 1 口固定、每口單邊 2.5 美元已寫在 strategy()；圖表要一般 K 線、開「依合約變更調整」。
+// 縮排：整份只有最後 if 底下兩行要縮排；entry 寫 4 格、alert 寫 0 格（Monaco 會繼承上一行的 4 格）。
+//@version=6
+strategy("期貨趨勢 RF 濾網", overlay=true, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, initial_capital=100000, calc_on_every_tick=false, commission_type=strategy.commission.cash_per_contract, commission_value=2.5)
+per = input.int(370, "取樣週期", minval=1)
+mult = input.float(25.8, "範圍倍數", minval=0.1, step=0.1)
+useAtr = input.bool(true, "ATR 過濾")
+atrLen = input.int(12, "ATR 長度")
+atrMult = input.float(1.5, "ATR 倍數", step=0.1)
+useVol = input.bool(true, "成交量過濾")
+volLen = input.int(20, "成交量平均長度")
+warmX = input.int(6, "暖機倍數（暖機根數＝取樣 × 這個數）", minval=0)
+grpName = input.string("GA 濾網版", "組別名稱（會出現在警報訊息第二行）")
+regMode = input.int(0, "日線濾網（0 不用、1 偏多不做空、2 偏空不做多）", minval=0, maxval=2)
+maLen = input.int(150, "日線均線長度（天）", minval=2)
+skipMin = input.int(0, "數據時段不換方向（美東 8:30 起幾分鐘，0 不用）", minval=0)
+src = hl2
+diff = math.abs(src - src[1])
+avrng = ta.ema(diff, per)
+smrng = ta.ema(avrng, per * 2 - 1) * mult
+var float filt = na
+pv = nz(filt)
+filt := src > pv ? (src - smrng < pv ? pv : src - smrng) : (src + smrng > pv ? pv : src + smrng)
+var int up = 0
+var int dn = 0
+up := filt > filt[1] ? up + 1 : filt < filt[1] ? 0 : up
+dn := filt < filt[1] ? dn + 1 : filt > filt[1] ? 0 : dn
+moved = src != src[1]
+longCond = src > filt and moved and up > 0
+shortCond = src < filt and moved and dn > 0
+atrV = ta.atr(atrLen)
+longF = not useAtr or close > close - atrV * atrMult
+shortF = not useAtr or close < close + atrV * atrMult
+volOK = not useVol or volume > ta.sma(volume, volLen) * 0.8
+longSig = longCond and longF and volOK
+shortSig = shortCond and shortF and volOK
+var int ci = 0
+pci = ci
+ci := longSig ? 1 : shortSig ? -1 : pci
+go = bar_index >= warmX * per
+dC = request.security(syminfo.tickerid, "D", close[1], lookahead=barmerge.lookahead_on)
+dM = request.security(syminfo.tickerid, "D", ta.sma(close, maLen)[1], lookahead=barmerge.lookahead_on)
+bull = dC > dM
+bear = dC < dM
+etMin = hour(time, "America/New_York") * 60 + minute(time, "America/New_York")
+inSkip = skipMin > 0 and etMin >= 510 and etMin < 510 + skipMin
+want = regMode == 1 and bull ? 1 : regMode == 2 and bear ? -1 : ci
+cur = strategy.position_size > 0 ? 1 : strategy.position_size < 0 ? -1 : 0
+first = go and longSig and pci == -1 ? 1 : go and shortSig and pci == 1 ? -1 : 0
+dirNow = cur == 0 ? first : go and want != 0 and want != cur and not inSkip ? want : 0
+posCol = strategy.position_size > 0 ? color.new(#ff3b3b, 0) : strategy.position_size < 0 ? color.new(#4cff00, 0) : color.new(#7a8494, 0)
+plot(filt, "濾網線", color=posCol, linewidth=2)
+barcolor(posCol)
+alertMsg = (dirNow > 0 ? "▲ 翻多" : "▼ 翻空") + "\n" + grpName + "\n\n訊號時間　" + str.format_time(time, "MM-dd HH:mm", "Asia/Taipei") + "\n訊號價　　" + str.tostring(close, format.mintick)
+if dirNow != 0
+    strategy.entry(dirNow > 0 ? "多" : "空", dirNow > 0 ? strategy.long : strategy.short)
+    alert(alertMsg, alert.freq_once_per_bar_close)
