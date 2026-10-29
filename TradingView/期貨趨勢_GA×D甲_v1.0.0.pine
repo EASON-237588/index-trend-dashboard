@@ -1,0 +1,62 @@
+// 期貨趨勢・GA×D甲 綜合體 v1.0.0（2026-10-29 公司建立，使用者要求「長期 D 甲、短期 GA 搞一個綜合體當中期」）
+// 以 期貨趨勢_RF濾網_v1.0.0 為底，RF 算法與前 9 個輸入一字不改；把「日線濾網」換成「D 甲方向」：
+//   D 甲＝6 分 K 規則 7（首次用回看通道定方向，之後多單跌破出場線翻空、空單突破出場線翻多）＋前一日收盤 ≥ 日線均線時空單改做多。
+//   6 分與日線都取「上一根已收完」的值（[1]＋lookahead_on），不偷看。
+// mode：1 D 甲做多時不做空（GA 空訊號改續抱多），D 甲做空時 GA 自由多空
+//       2 D 甲做空時不做多，D 甲做多時 GA 自由多空
+//       3 部位直接等於 D 甲（驗算用，應與 D 甲回測一致）
+// 永遠在場內，只換方向、沒有空手。
+//@version=6
+strategy("期貨趨勢 GA×D甲", overlay=true, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, initial_capital=100000, calc_on_every_tick=false, commission_type=strategy.commission.cash_per_contract, commission_value=2.5)
+per = input.int(247, "取樣週期", minval=1)
+mult = input.float(20.7, "範圍倍數", minval=0.1, step=0.1)
+useAtr = input.bool(true, "ATR 過濾")
+atrLen = input.int(12, "ATR 長度")
+atrMult = input.float(1.5, "ATR 倍數", step=0.1)
+useVol = input.bool(true, "成交量過濾")
+volLen = input.int(20, "成交量平均長度")
+warmX = input.int(6, "暖機倍數（暖機根數＝取樣 × 這個數）", minval=0)
+mode = input.int(1, "綜合方式（1 D甲多不做空、2 D甲空不做多、3 等於 D甲）", minval=1, maxval=3)
+dLookH = input.int(350, "D甲 回看小時")
+dDiv = input.float(2.5, "D甲 出場線比例（回看÷這個數）")
+dMa = input.int(150, "D甲 日線均線（天）")
+src = hl2
+diff = math.abs(src - src[1])
+avrng = ta.ema(diff, per)
+smrng = ta.ema(avrng, per * 2 - 1) * mult
+var float filt = na
+pv = nz(filt)
+filt := src > pv ? (src - smrng < pv ? pv : src - smrng) : (src + smrng > pv ? pv : src + smrng)
+var int up = 0
+var int dn = 0
+up := filt > filt[1] ? up + 1 : filt < filt[1] ? 0 : up
+dn := filt < filt[1] ? dn + 1 : filt > filt[1] ? 0 : dn
+moved = src != src[1]
+longCond = src > filt and moved and up > 0
+shortCond = src < filt and moved and dn > 0
+atrV = ta.atr(atrLen)
+longF = not useAtr or close > close - atrV * atrMult
+shortF = not useAtr or close < close + atrV * atrMult
+volOK = not useVol or volume > ta.sma(volume, volLen) * 0.8
+longSig = longCond and longF and volOK
+shortSig = shortCond and shortF and volOK
+var int ci = 0
+pci = ci
+ci := longSig ? 1 : shortSig ? -1 : pci
+go = bar_index >= warmX * per
+look = math.min(4999, math.max(2, math.round(dLookH * 10)))
+exn = math.max(10, math.round(look / dDiv))
+[c6, hh, ll, he, le] = request.security(syminfo.tickerid, "6", [close[1], ta.highest(high, look)[2], ta.lowest(low, look)[2], ta.highest(high, exn)[2], ta.lowest(low, exn)[2]], lookahead=barmerge.lookahead_on)
+var int r7 = 0
+r7 := na(hh) ? 0 : r7 == 0 ? (c6 > hh ? 1 : c6 < ll ? -1 : 0) : r7 == 1 ? (c6 < le ? -1 : 1) : (c6 > he ? 1 : -1)
+dUp = request.security(syminfo.tickerid, "D", close[1] >= ta.sma(close, dMa)[1], lookahead=barmerge.lookahead_on)
+dA = r7 == 1 or dUp ? 1 : r7 == -1 ? -1 : 0
+want = mode == 3 ? dA : mode == 1 and dA == 1 ? 1 : mode == 2 and dA == -1 ? -1 : ci
+cur = strategy.position_size > 0 ? 1 : strategy.position_size < 0 ? -1 : 0
+first = mode == 3 ? (dA != 0 ? dA : 0) : go and longSig and pci == -1 ? 1 : go and shortSig and pci == 1 ? -1 : 0
+dirNow = cur == 0 ? first : (mode == 3 or go) and want != 0 and want != cur ? want : 0
+posCol = strategy.position_size > 0 ? color.new(#ff3b3b, 0) : strategy.position_size < 0 ? color.new(#4cff00, 0) : color.new(#7a8494, 0)
+plot(filt, "濾網線", color=posCol, linewidth=2)
+barcolor(posCol)
+if dirNow != 0
+    strategy.entry(dirNow > 0 ? "多" : "空", dirNow > 0 ? strategy.long : strategy.short)
