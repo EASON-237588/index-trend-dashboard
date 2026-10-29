@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.39.1</title>
+<title>期貨趨勢 v1.40.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -219,6 +219,24 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 .st tr.pass td.nt{color:#ffd400;font-weight:700}
 .st tr.wait td{color:var(--mute)}
 .st .sec td{color:var(--mute);text-align:left;padding-top:8px;border-bottom:1px solid #00e5ff}
+/* v1.40.0（使用者 2026-10-29「明細表太小、要按照我的分類」）：組別按鈕分四類一列一類（那斯達克短趨勢／中長趨勢／台指／黃金，格子已拿掉的放「已拿掉」）；
+   電腦版明細視窗放大到幾乎滿版、置中，字也放大 */
+.tk .cat{display:flex;gap:4px;flex-wrap:wrap;align-items:center;width:100%}
+.tk .cat>i{font-style:normal;color:var(--text);font-size:12px;font-weight:700;min-width:8em}
+.lay-w .sheet{align-items:center}
+.lay-w .sheet .in{max-width:min(1400px,96vw);max-height:94dvh;border-radius:12px;padding:16px 24px 24px;font-size:15px}
+.lay-w .sheet .top{font-size:18px}
+.lay-w .tk{gap:6px;margin-bottom:12px}
+.lay-w .tk .cat>i{font-size:14px;min-width:9em}
+.lay-w .tk button{font-size:14px;padding:4px 12px}
+.lay-w .tt{font-size:14px}
+.lay-w .tt small{font-size:12.5px}
+.lay-w .tsum{font-size:14px}
+.lay-w .tsum .tot{font-size:28px}
+.lay-w .tnote{font-size:13px}
+.lay-w .spec span{font-size:13px}
+.lay-w .st th:nth-child(3),.lay-w .st td:nth-child(3){min-width:220px}
+.lay-w .st td.nt{min-width:300px}
 /* v1.25.0 電腦版排版（使用者 2026-10-23 決定：手機版與電腦版同一份程式，依螢幕寬度自動切，也可手動選）。
    電腦版＝這一頁的格子並排、自動換行，可上下捲動；規則、資料、交易明細完全不動。 */
 .lay-w .app{max-width:none}
@@ -271,7 +289,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.39.1";   // v1.39.1：彩虹圈加到甲 30 秒與黃金 F 甲（D 甲原本就有；台指不加），每頁各一格（使用者 2026-10-29）。 v1.39.0：手機與電腦都改成四個分頁（那斯達克短趨勢、那斯達克中長趨勢、台指、黃金），電腦版不再 21 格同一頁；觀察二那斯達克歸短趨勢、觀察二台指歸台指、觀察三歸中長趨勢；G／H／I 格不顯示（紀錄與績效表照留）；恆生格、恆生資料讀取與績效表恆生列刪除（TradingView「恆生傳送」同日刪除）（使用者 2026-10-29）。 v1.38.0：推播框跟著警報走——由 GA 移到 D 甲（10/29 起警報只留 TradingView D 甲，GA 推播已停），黃線閃爍改成彩虹霓虹走馬燈（使用者 2026-10-29）。 v1.37.0：績效表分短週期、中長週期兩張各自排名（每週翻向 2 次以下歸中長，中長不看平倉筆數），獲利名次、篩選名次移到最前面（使用者 2026-10-29）。 v1.36.0：那斯達克績效改成每點 20 元台幣、單邊手續費 25 元（來回 50 元＝2.5 點，跟原本成本比例相同），不再乘匯率（使用者 2026-10-29）。 v1.35.1：LINE／Telegram 推播由 B2 改推 GA（37 秒 300/23），推播黃框移到 GA；B2 改由 TradingView 849 警報。 v1.35.0：新增觀察三（乙＋170 日、乙＋150 日、甲＋150 日：乙／甲 45 秒 RF，前一日連續月 NQ 收盤在 N 日均線上不做空），手機版「觀察三」分頁、電腦版第 7 欄。 v1.34.10：手機橫放拿掉 560 寬上限、滿版。 v1.34.9：浮水印由前三名加到前四名（1～4）。 v1.34.8：手機版一屏改 2 欄 × 2 列（仍是 4 格、照前四名排），原本 1 欄 × 4 列。 v1.34.7：LINE 推播回到 B2（使用者同晚說「改 用 B2」），推播黃框由平衡板移回 B2。 v1.34.6：LINE 推播改推平衡板（甲 30 秒＋乙 45 秒同向才持有，進多／進空／轉空手都推），推播黃框由 B2 移到平衡板。 v1.34.5：LINE 推播退回 B2（37 秒 450/23），推播黃框由乙移回 B2。 v1.34.4：手機版一屏改 1 欄 × 4 列放 4 格，每頁先放篩選前四名（照名次、名次變了自動重排），B2 不再整排；前三名圖表區加 1、2、3 浮水印。 v1.34.3：修 B2 格設定被註解吃掉（顯示 undefined、載不出來，手機版右欄被撐出畫面也是這個原因）。 v1.34.2：手機版短趨勢頁改排法（上 B2 整排、中 GA／甲30、下 乙45／甲乙同；甲45、短趨勢・B、B3 移到第 2 屏）。 v1.34.1：LINE 推播由 B2 改成乙（45 秒 576/27），推播黃框移到乙。 v1.34.0：新增平衡板（甲 30 秒與乙 45 秒同向才持有，紀錄代號 BAL）。 v1.33.1：手機翻屏改點底部「1」「2」按鈕（圖表會吃掉手指拖曳，滑不動）。 v1.33.0：手機版一頁超過 6 格改成 2 欄 × 3 列一屏、左右滑動翻屏（底下圓點標第幾屏）。 v1.32.0：績效表篩選加嚴格四關（拿掉最大一筆仍賺、前後段都賺、合計 ≥ 回落 2 倍、連虧 ≤ 7），前四名紅字照新篩選。 v1.31.3：觀察二 555/23（左中）改用 Gate 逐筆合成 30 秒（原生 30 秒只回溯約 3.5 天，畫面從 10/23 起、跟旁邊格對不起來；紀錄 O1 本來就用逐筆合成）。 v1.31.2：藍色分組框再改 1px，跟紅框同粗。v1.31.1：藍框由 3px 改 2px（使用者嫌太粗）。 v1.31.0：只有篩選前四名紅字閃爍，其餘黑底黃字不閃。 v1.30.0：中長趨勢加 E 甲、F 甲（E、F 加幣安 PAXG 日線 200 日偏多，永遠在場），明細與績效表加兩組（紀錄 EG／FG，7/15 起算），電腦版改 6 欄。v1.29.3：D 甲乙丙起算列改真正進場日（4/06、4/08），格子找不到進場訊號時改讀正式紀錄，跟交易明細一致。v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+const VERSION = "v1.40.0";   // v1.40.0：明細視窗電腦版放大到幾乎滿版、字加大；組別按鈕與績效表照四類分（那斯達克短趨勢、中長趨勢、台指、黃金，格子已拿掉的舊 A、G、H、I 放「已拿掉」），各類自己排名（使用者 2026-10-29）。 v1.39.1：彩虹圈加到甲 30 秒與黃金 F 甲（D 甲原本就有；台指不加），每頁各一格（使用者 2026-10-29）。 v1.39.0：手機與電腦都改成四個分頁（那斯達克短趨勢、那斯達克中長趨勢、台指、黃金），電腦版不再 21 格同一頁；觀察二那斯達克歸短趨勢、觀察二台指歸台指、觀察三歸中長趨勢；G／H／I 格不顯示（紀錄與績效表照留）；恆生格、恆生資料讀取與績效表恆生列刪除（TradingView「恆生傳送」同日刪除）（使用者 2026-10-29）。 v1.38.0：推播框跟著警報走——由 GA 移到 D 甲（10/29 起警報只留 TradingView D 甲，GA 推播已停），黃線閃爍改成彩虹霓虹走馬燈（使用者 2026-10-29）。 v1.37.0：績效表分短週期、中長週期兩張各自排名（每週翻向 2 次以下歸中長，中長不看平倉筆數），獲利名次、篩選名次移到最前面（使用者 2026-10-29）。 v1.36.0：那斯達克績效改成每點 20 元台幣、單邊手續費 25 元（來回 50 元＝2.5 點，跟原本成本比例相同），不再乘匯率（使用者 2026-10-29）。 v1.35.1：LINE／Telegram 推播由 B2 改推 GA（37 秒 300/23），推播黃框移到 GA；B2 改由 TradingView 849 警報。 v1.35.0：新增觀察三（乙＋170 日、乙＋150 日、甲＋150 日：乙／甲 45 秒 RF，前一日連續月 NQ 收盤在 N 日均線上不做空），手機版「觀察三」分頁、電腦版第 7 欄。 v1.34.10：手機橫放拿掉 560 寬上限、滿版。 v1.34.9：浮水印由前三名加到前四名（1～4）。 v1.34.8：手機版一屏改 2 欄 × 2 列（仍是 4 格、照前四名排），原本 1 欄 × 4 列。 v1.34.7：LINE 推播回到 B2（使用者同晚說「改 用 B2」），推播黃框由平衡板移回 B2。 v1.34.6：LINE 推播改推平衡板（甲 30 秒＋乙 45 秒同向才持有，進多／進空／轉空手都推），推播黃框由 B2 移到平衡板。 v1.34.5：LINE 推播退回 B2（37 秒 450/23），推播黃框由乙移回 B2。 v1.34.4：手機版一屏改 1 欄 × 4 列放 4 格，每頁先放篩選前四名（照名次、名次變了自動重排），B2 不再整排；前三名圖表區加 1、2、3 浮水印。 v1.34.3：修 B2 格設定被註解吃掉（顯示 undefined、載不出來，手機版右欄被撐出畫面也是這個原因）。 v1.34.2：手機版短趨勢頁改排法（上 B2 整排、中 GA／甲30、下 乙45／甲乙同；甲45、短趨勢・B、B3 移到第 2 屏）。 v1.34.1：LINE 推播由 B2 改成乙（45 秒 576/27），推播黃框移到乙。 v1.34.0：新增平衡板（甲 30 秒與乙 45 秒同向才持有，紀錄代號 BAL）。 v1.33.1：手機翻屏改點底部「1」「2」按鈕（圖表會吃掉手指拖曳，滑不動）。 v1.33.0：手機版一頁超過 6 格改成 2 欄 × 3 列一屏、左右滑動翻屏（底下圓點標第幾屏）。 v1.32.0：績效表篩選加嚴格四關（拿掉最大一筆仍賺、前後段都賺、合計 ≥ 回落 2 倍、連虧 ≤ 7），前四名紅字照新篩選。 v1.31.3：觀察二 555/23（左中）改用 Gate 逐筆合成 30 秒（原生 30 秒只回溯約 3.5 天，畫面從 10/23 起、跟旁邊格對不起來；紀錄 O1 本來就用逐筆合成）。 v1.31.2：藍色分組框再改 1px，跟紅框同粗。v1.31.1：藍框由 3px 改 2px（使用者嫌太粗）。 v1.31.0：只有篩選前四名紅字閃爍，其餘黑底黃字不閃。 v1.30.0：中長趨勢加 E 甲、F 甲（E、F 加幣安 PAXG 日線 200 日偏多，永遠在場），明細與績效表加兩組（紀錄 EG／FG，7/15 起算），電腦版改 6 欄。v1.29.3：D 甲乙丙起算列改真正進場日（4/06、4/08），格子找不到進場訊號時改讀正式紀錄，跟交易明細一致。v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
 //    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
@@ -1252,8 +1270,13 @@ function buildDOM(){
       <div class="wait" id="wait-${p.k}">${p.waitMsg || "載入中…"}</div>
     </div>
   </section>`).join("") + GRP_AREAS.map(a => `<div class="grp" style="grid-area:${a}"></div>`).join("");
-  $("tradeTabs").innerHTML = `<button data-k="SUM">績效表</button>` +   // v1.20.0
-    TRADE_K.map(T => `<button data-k="${T.k}">${T.name}</button>`).join("");
+  // v1.40.0 組別按鈕照四類分列，類內照電腦版該頁的格子順序
+  const ord = T => { const D = DESK[TCAT(T)]; return D ? D.keys.indexOf(T.pk) : 0; };
+  $("tradeTabs").innerHTML = `<div class="cat"><button data-k="SUM">績效表</button></div>` +   // v1.20.0
+    Object.keys(CAT_NAME).map(c => {
+      const L = TRADE_K.filter(T => TCAT(T) === c).sort((a, b) => ord(a) - ord(b));
+      return L.length ? `<div class="cat"><i>${CAT_NAME[c]}</i>${L.map(T => `<button data-k="${T.k}">${T.name}</button>`).join("")}</div>` : "";
+    }).join("");
   applyTop();
   $("tradeTabs").onclick = e => {
     const k = e.target.dataset && e.target.dataset.k; if(!k) return;
@@ -1681,6 +1704,10 @@ const SUM_MIN_N = 20, SUM_MIN_PF = 1.5;
 /* v1.37.0（2026-10-29 使用者要求）：績效表分「短週期」「中長週期」兩張各自排名。分類依操作負擔：每週翻向 2 次以下歸中長
    （D 系列、觀察三、I、黃金）；中長週期不看平倉筆數，其餘六關照舊。開工的 daily_table.js 用同一份分組 */
 const SUM_LONG = new Set(["C", "C2", "DA", "DB", "DC", "Y170", "Y150", "J150", "R2", "D", "E", "EG", "FG"]);
+/* v1.40.0（使用者 2026-10-29「要按照我的分類」）：明細按鈕與績效表照畫面四類分，各類自己排名；分類跟著格子所在的分頁（PANELS 的 pg），
+   格子已拿掉（舊 A、G、H、I）歸「已拿掉」，只看紀錄。篩選門檻照舊（SUM_LONG 不看平倉筆數）。開工 daily_table.js 用同一套分類 */
+const CAT_NAME = {short:"那斯達克短趨勢", long:"那斯達克中長趨勢", tx:"台指", gold:"黃金", gone:"已拿掉"};
+const TCAT = T => { const p = PAN(T.pk); return p && CAT_NAME[p.pg] ? p.pg : "gone"; };
 /* v1.32.0（2026-10-26 使用者看過試算後要求加入）：篩選在原本三關之外再加嚴格四關，七關全過才算「通過」、才有篩選名次與紅字。
    ① 拿掉賺最多那一筆，合計仍為正　② 前後兩段都賺　③ 合計 ≥ 最大回落 × 2　④ 最多連虧 ≤ 7 筆 */
 const SUM_DD_X = 2, SUM_MAX_LOSE = 7;
@@ -1746,14 +1773,14 @@ function sumRows(){   // 績效表與篩選前四名共用
     const scr = ok.filter(pass).sort((a, b) => b.pf - a.pf);
     return {ok, scr, wait:list.filter(r => r.wait)};
   };
-  // twd＝短週期台幣組（篩選前四名紅字只看這組）；twdL＝中長週期台幣組
-  const twd = byOrder(rows.filter(r => !r.gold && !SUM_LONG.has(r.T.k))), twdL = byOrder(rows.filter(r => !r.gold && SUM_LONG.has(r.T.k)));
-  const gold = byOrder(rows.filter(r => r.gold));
-  return {rows, twd, twdL, gold, pass, liveN, upTo};
+  // v1.40.0 照四類各自排名；twd＝那斯達克短趨勢（篩選前四名紅字只看這組）
+  const cats = {};
+  for(const c of Object.keys(CAT_NAME)) cats[c] = byOrder(rows.filter(r => TCAT(r.T) === c));
+  return {rows, cats, twd:cats.short, pass, liveN, upTo};
 }
 function renderSummary(){
   if(!LOGROWS) return `<div class="tnote">${logErr || "讀取進出紀錄中…"}</div>`;
-  const {rows, twd, twdL, gold, pass, liveN, upTo} = sumRows();
+  const {rows, cats, pass, liveN, upTo} = sumRows();
   const note = r => {
     if(!r.cnt) return "未通過：尚無已平倉" + (r.T.self === "hsi" ? "，資料還在累積" : "");
     if(pass(r)) return r.pf < SUM_MIN_PF + 0.05 ? "通過（只比門檻高一點）" : "通過";
@@ -1778,13 +1805,13 @@ function renderSummary(){
   const head = `<thead><tr><th title="獲利名次（依合計）">名次</th><th title="篩選名次（七關全過，依獲利因子）">篩選</th><th>組別</th><th>已平倉（賺／賠）</th><th>合計</th><th>獲利因子</th><th>勝率</th><th>備註</th></tr></thead>`;
   const table = (title, sub, body) => `<div class="tsum"><div class="tot" style="font-size:18px">${title}</div><div>${sub}</div></div>
     <div class="stw"><table class="tt st">${head}<tbody>${body}</tbody></table></div>`;
-  const bodyS = twd.ok.map((r, i) => tr(r, i, twd, false)).join("") + twd.wait.map(trW).join("");
-  const bodyL = sec("那斯達克依合計排名") + twdL.ok.map((r, i) => tr(r, i, twdL, false)).join("") + twdL.wait.map(trW).join("") +
-    sec("黃金只在黃金內排名") + gold.ok.map((r, i) => tr(r, i, gold, true)).join("") + gold.wait.map(trW).join("");
   const rule = `獲利因子 ≥ ${SUM_MIN_PF}、合計 > 0；拿掉最大一筆仍賺、前後段都賺、合計 ≥ 最大回落 ${SUM_DD_X} 倍、連虧 ≤ ${SUM_MAX_LOSE} 筆`;
-  return table("績效表・短週期", `通過篩選 ${twd.scr.length} 組（已平倉 ≥ ${SUM_MIN_N} 筆、${rule}）`, bodyS) +
-    table("績效表・中長週期", `通過篩選：那斯達克 ${twdL.scr.length} 組、黃金 ${gold.scr.length} 組（不看平倉筆數；${rule}）・每週翻向 2 次以下歸中長週期`, bodyL) + `
-    <div class="tnote">合計只算已平倉，不含持有中浮動（各組頁面的「合計」有含浮動，兩者不同）・那斯達克：每點 ${MNQ.pt} 元、單邊手續費 ${MNQ.fee} 元・台指：微台 1 口、單邊手續費 ${TMF.fee} 元＋期交稅・黃金：美元／盎司、未扣成本・恆生：點數、未扣成本（手續費在各組頁面改）<br>
+  const SUB = {short:`已平倉 ≥ ${SUM_MIN_N} 筆、${rule}`, long:`不看平倉筆數；${rule}`, tx:`已平倉 ≥ ${SUM_MIN_N} 筆、${rule}`, gold:`不看平倉筆數；${rule}`,
+    gone:`格子已從畫面拿掉，只看正式紀錄；${rule}`};
+  return Object.keys(CAT_NAME).filter(c => cats[c].ok.length || cats[c].wait.length).map(c =>
+    table(`績效表・${CAT_NAME[c]}`, `通過篩選 ${cats[c].scr.length} 組（${SUB[c]}）`,
+      cats[c].ok.map((r, i) => tr(r, i, cats[c], c === "gold")).join("") + cats[c].wait.map(trW).join(""))).join("") + `
+    <div class="tnote">合計只算已平倉，不含持有中浮動（各組頁面的「合計」有含浮動，兩者不同）・那斯達克：每點 ${MNQ.pt} 元、單邊手續費 ${MNQ.fee} 元・台指：微台 1 口、單邊手續費 ${TMF.fee} 元＋期交稅・黃金：美元／盎司、未扣成本（手續費在各組頁面改）<br>
       獲利因子＝扣成本後賺的合計÷賠的合計・勝率＝賺的筆數÷已平倉（點數大於 0 算賺）・資料到 ${upTo ? tText(upTo) : "—"}・開著會自動更新${liveN ? `・含 ${liveN} 筆◆網頁即時算的交易，下次開工以正式紀錄為準` : ""}</div>`;
 }
 function renderTrades(){
