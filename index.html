@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.38.0</title>
+<title>期貨趨勢 v1.39.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -58,6 +58,14 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
   h1 small{font-size:10px;margin-left:3px}
   .tabs button{padding:3px 4px;font-size:11.5px}
   header .hbtn{padding:3px 5px;font-size:11.5px}
+}
+/* v1.39.0 分頁改成「那斯達克短趨勢／那斯達克中長趨勢／台指／黃金」，名稱長、標題列塞不下：
+   560 寬以下分頁列換到第二行、四顆平分寬度（明細、排版鈕留在第一行） */
+@media (max-width:560px){
+  header{flex-wrap:wrap;row-gap:4px}
+  .tabs{order:9;flex:1 0 100%}
+  .tabs button{flex:1 1 auto;padding:4px 2px}
+  .loadbar{top:66px}   /* 標題列變兩行（高 64），進度條往下移，不然會蓋住分頁按鈕、點不到 */
 }
 .status{font-size:11px;color:var(--mute);display:flex;align-items:center;gap:5px;min-width:0;white-space:nowrap;overflow:hidden}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);display:inline-block;flex:none}
@@ -215,8 +223,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
    電腦版＝這一頁的格子並排、自動換行，可上下捲動；規則、資料、交易明細完全不動。 */
 .lay-w .app{max-width:none}
 /* 電腦版：指定的 17 格（v1.30.0 起 6 欄）同一頁、不捲動、不翻頁，五欄三列（v1.27.0 由三欄改四欄，第 4 欄放 GA 優化前三名；v1.29.0 改五欄，第 5 欄放 D 甲乙丙），每格一樣大；分頁列隱藏 */
-.lay-w #tabs{display:none}
-.lay-w .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:6px;padding:4px 8px 8px;overflow:hidden}
+.lay-w .grid{display:grid;grid-template-columns:repeat(var(--dc,4),minmax(0,1fr));grid-template-rows:repeat(var(--dr,2),minmax(0,1fr));gap:6px;padding:4px 8px 8px;overflow:hidden}
 .lay-w .panel{flex:none;height:auto;min-height:0}
 /* v1.27.0 四欄後每格變窄：標題列縮字、組合名稱放不下時用「…」收尾，現價固定在最右邊不溢出到隔壁格 */
 .lay-w .ph{gap:4px;overflow:hidden;min-width:0}
@@ -238,7 +245,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 <div class="app">
 <header>
   <h1>期貨趨勢<small id="ver"></small></h1>
-  <div class="tabs" id="tabs"><button data-pg="short">短趨勢</button><button data-pg="tx">台指</button><button data-pg="long">趨勢</button><button data-pg="obs">觀察</button><button data-pg="obs2">觀察二</button><button data-pg="obs3">觀察三</button></div>
+  <div class="tabs" id="tabs"><button data-pg="short">那斯達克短趨勢</button><button data-pg="long">那斯達克中長趨勢</button><button data-pg="tx">台指</button><button data-pg="gold">黃金</button></div>
   <!-- v1.20.1 使用者 2026-10-21 要求標題列文字縮短：中長趨勢→趨勢、交易明細→明細（面板內標籤與明細視窗標題不變） -->
   <button class="hbtn" id="tradeBtn">明細</button>
   <!-- v1.25.0：排版切換，自動＝螢幕寬 900px 以上用電腦版；選擇只存在這台瀏覽器 -->
@@ -264,7 +271,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.38.0";   // v1.38.0：推播框跟著警報走——由 GA 移到 D 甲（10/29 起警報只留 TradingView D 甲，GA 推播已停），黃線閃爍改成彩虹霓虹走馬燈（使用者 2026-10-29）。 v1.37.0：績效表分短週期、中長週期兩張各自排名（每週翻向 2 次以下歸中長，中長不看平倉筆數），獲利名次、篩選名次移到最前面（使用者 2026-10-29）。 v1.36.0：那斯達克績效改成每點 20 元台幣、單邊手續費 25 元（來回 50 元＝2.5 點，跟原本成本比例相同），不再乘匯率（使用者 2026-10-29）。 v1.35.1：LINE／Telegram 推播由 B2 改推 GA（37 秒 300/23），推播黃框移到 GA；B2 改由 TradingView 849 警報。 v1.35.0：新增觀察三（乙＋170 日、乙＋150 日、甲＋150 日：乙／甲 45 秒 RF，前一日連續月 NQ 收盤在 N 日均線上不做空），手機版「觀察三」分頁、電腦版第 7 欄。 v1.34.10：手機橫放拿掉 560 寬上限、滿版。 v1.34.9：浮水印由前三名加到前四名（1～4）。 v1.34.8：手機版一屏改 2 欄 × 2 列（仍是 4 格、照前四名排），原本 1 欄 × 4 列。 v1.34.7：LINE 推播回到 B2（使用者同晚說「改 用 B2」），推播黃框由平衡板移回 B2。 v1.34.6：LINE 推播改推平衡板（甲 30 秒＋乙 45 秒同向才持有，進多／進空／轉空手都推），推播黃框由 B2 移到平衡板。 v1.34.5：LINE 推播退回 B2（37 秒 450/23），推播黃框由乙移回 B2。 v1.34.4：手機版一屏改 1 欄 × 4 列放 4 格，每頁先放篩選前四名（照名次、名次變了自動重排），B2 不再整排；前三名圖表區加 1、2、3 浮水印。 v1.34.3：修 B2 格設定被註解吃掉（顯示 undefined、載不出來，手機版右欄被撐出畫面也是這個原因）。 v1.34.2：手機版短趨勢頁改排法（上 B2 整排、中 GA／甲30、下 乙45／甲乙同；甲45、短趨勢・B、B3 移到第 2 屏）。 v1.34.1：LINE 推播由 B2 改成乙（45 秒 576/27），推播黃框移到乙。 v1.34.0：新增平衡板（甲 30 秒與乙 45 秒同向才持有，紀錄代號 BAL）。 v1.33.1：手機翻屏改點底部「1」「2」按鈕（圖表會吃掉手指拖曳，滑不動）。 v1.33.0：手機版一頁超過 6 格改成 2 欄 × 3 列一屏、左右滑動翻屏（底下圓點標第幾屏）。 v1.32.0：績效表篩選加嚴格四關（拿掉最大一筆仍賺、前後段都賺、合計 ≥ 回落 2 倍、連虧 ≤ 7），前四名紅字照新篩選。 v1.31.3：觀察二 555/23（左中）改用 Gate 逐筆合成 30 秒（原生 30 秒只回溯約 3.5 天，畫面從 10/23 起、跟旁邊格對不起來；紀錄 O1 本來就用逐筆合成）。 v1.31.2：藍色分組框再改 1px，跟紅框同粗。v1.31.1：藍框由 3px 改 2px（使用者嫌太粗）。 v1.31.0：只有篩選前四名紅字閃爍，其餘黑底黃字不閃。 v1.30.0：中長趨勢加 E 甲、F 甲（E、F 加幣安 PAXG 日線 200 日偏多，永遠在場），明細與績效表加兩組（紀錄 EG／FG，7/15 起算），電腦版改 6 欄。v1.29.3：D 甲乙丙起算列改真正進場日（4/06、4/08），格子找不到進場訊號時改讀正式紀錄，跟交易明細一致。v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+const VERSION = "v1.39.0";   // v1.39.0：手機與電腦都改成四個分頁（那斯達克短趨勢、那斯達克中長趨勢、台指、黃金），電腦版不再 21 格同一頁；觀察二那斯達克歸短趨勢、觀察二台指歸台指、觀察三歸中長趨勢；G／H／I 格不顯示（紀錄與績效表照留）；恆生格、恆生資料讀取與績效表恆生列刪除（TradingView「恆生傳送」同日刪除）（使用者 2026-10-29）。 v1.38.0：推播框跟著警報走——由 GA 移到 D 甲（10/29 起警報只留 TradingView D 甲，GA 推播已停），黃線閃爍改成彩虹霓虹走馬燈（使用者 2026-10-29）。 v1.37.0：績效表分短週期、中長週期兩張各自排名（每週翻向 2 次以下歸中長，中長不看平倉筆數），獲利名次、篩選名次移到最前面（使用者 2026-10-29）。 v1.36.0：那斯達克績效改成每點 20 元台幣、單邊手續費 25 元（來回 50 元＝2.5 點，跟原本成本比例相同），不再乘匯率（使用者 2026-10-29）。 v1.35.1：LINE／Telegram 推播由 B2 改推 GA（37 秒 300/23），推播黃框移到 GA；B2 改由 TradingView 849 警報。 v1.35.0：新增觀察三（乙＋170 日、乙＋150 日、甲＋150 日：乙／甲 45 秒 RF，前一日連續月 NQ 收盤在 N 日均線上不做空），手機版「觀察三」分頁、電腦版第 7 欄。 v1.34.10：手機橫放拿掉 560 寬上限、滿版。 v1.34.9：浮水印由前三名加到前四名（1～4）。 v1.34.8：手機版一屏改 2 欄 × 2 列（仍是 4 格、照前四名排），原本 1 欄 × 4 列。 v1.34.7：LINE 推播回到 B2（使用者同晚說「改 用 B2」），推播黃框由平衡板移回 B2。 v1.34.6：LINE 推播改推平衡板（甲 30 秒＋乙 45 秒同向才持有，進多／進空／轉空手都推），推播黃框由 B2 移到平衡板。 v1.34.5：LINE 推播退回 B2（37 秒 450/23），推播黃框由乙移回 B2。 v1.34.4：手機版一屏改 1 欄 × 4 列放 4 格，每頁先放篩選前四名（照名次、名次變了自動重排），B2 不再整排；前三名圖表區加 1、2、3 浮水印。 v1.34.3：修 B2 格設定被註解吃掉（顯示 undefined、載不出來，手機版右欄被撐出畫面也是這個原因）。 v1.34.2：手機版短趨勢頁改排法（上 B2 整排、中 GA／甲30、下 乙45／甲乙同；甲45、短趨勢・B、B3 移到第 2 屏）。 v1.34.1：LINE 推播由 B2 改成乙（45 秒 576/27），推播黃框移到乙。 v1.34.0：新增平衡板（甲 30 秒與乙 45 秒同向才持有，紀錄代號 BAL）。 v1.33.1：手機翻屏改點底部「1」「2」按鈕（圖表會吃掉手指拖曳，滑不動）。 v1.33.0：手機版一頁超過 6 格改成 2 欄 × 3 列一屏、左右滑動翻屏（底下圓點標第幾屏）。 v1.32.0：績效表篩選加嚴格四關（拿掉最大一筆仍賺、前後段都賺、合計 ≥ 回落 2 倍、連虧 ≤ 7），前四名紅字照新篩選。 v1.31.3：觀察二 555/23（左中）改用 Gate 逐筆合成 30 秒（原生 30 秒只回溯約 3.5 天，畫面從 10/23 起、跟旁邊格對不起來；紀錄 O1 本來就用逐筆合成）。 v1.31.2：藍色分組框再改 1px，跟紅框同粗。v1.31.1：藍框由 3px 改 2px（使用者嫌太粗）。 v1.31.0：只有篩選前四名紅字閃爍，其餘黑底黃字不閃。 v1.30.0：中長趨勢加 E 甲、F 甲（E、F 加幣安 PAXG 日線 200 日偏多，永遠在場），明細與績效表加兩組（紀錄 EG／FG，7/15 起算），電腦版改 6 欄。v1.29.3：D 甲乙丙起算列改真正進場日（4/06、4/08），格子找不到進場訊號時改讀正式紀錄，跟交易明細一致。v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
 //    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
@@ -726,14 +733,14 @@ const PANELS = [
    spec:{tf:"6 分", par:"出場線反手 450 小時・出場線 180 小時・日線 200 日均線之上空單改做多", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
    sub:"NQ 期貨單一月份合約 6 分（同 D）・出場線反手：首次用 450 小時通道定方向，之後破 180 小時出場線反手・日線 200 日均線之上空單改做多・永遠在場內",
    P:{lookH:450, exDiv:2.5, maLen:200, tfMin:6}},
-  {k:"gold8", pg:"long", title:"黃金", tf:"中長趨勢・E", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
+  {k:"gold8", pg:"gold", title:"黃金", tf:"中長趨勢・E", sym:"XAUUSDT", nq:false, kind:"don", tfMin:8, span:1e9, flatCol:"#ff3b3b",
    spec:{tf:"8 分", par:"Donchian 回看 350 小時・多空反轉・永遠在場", src:"Binance XAUUSDT"},
    sub:"Donchian 回看 350 小時（2,625 根）・多空反轉・永遠在場",
    P:{lookH:350, mode:"both", stopAtr:8, atrLen:14, tfMin:8}},
   /* v1.5.0 新增：黃金儀表板「上方」那組，也是 LINE 推播（V2.07 起）推的那組。
      資料、K 線切法、算法都照黃金儀表板：Binance 現貨 PAXG、24 小時、從 1970 起算的 11 分桶、calcDonG。
      現貨不在合約那條即時連線裡，改用每 20 秒輪詢（pollSpot）。 */
-  {k:"gold11", pg:"long", title:"黃金", tf:"中長趨勢・F", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
+  {k:"gold11", pg:"gold", title:"黃金", tf:"中長趨勢・F", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
    /* v1.5.1：畫面跟黃金儀表板上方一樣顯示最近 12,000 根（約 92 天）；
       多抓 2,200 根給回看 1,909 根＋ATR 暖機，起點的持倉狀態才對 */
    nq:false, kind:"don", tfMin:11, span:12000, needBars:14200, flatCol:"#4cff00", flatShort:true,
@@ -743,25 +750,25 @@ const PANELS = [
   /* v1.30.0 E 甲／F 甲（使用者 2026-10-26「加上去」）：E、F 加日線偏多，仍永遠在場內。日線用幣安 PAXG 日 K（DAILYG）200 日均線。
      TVC:GOLD 2007 起 19.5 年：E＋均線 150～200 × 回看 300～400 共 6 組 +3,757～+4,582 點、F＋均線 150～200 × 回看 250～350 共 6 組 +3,524～+4,297 點，
      都贏抱著約 +3,312（現行 E +459、F +484）；幣安 PAXG 2019 起驗證 E 甲 +1,964.92、F 甲 +1,906.65（現行 −743.94、−258.32）。 */
-  {k:"gold8d", pg:"long", title:"黃金", tf:"中長趨勢・E 甲", sym:"XAUUSDT", nq:false, kind:"don", r7:true, tfMin:8, span:1e9, flatCol:"#4cff00",
+  {k:"gold8d", pg:"gold", title:"黃金", tf:"中長趨勢・E 甲", sym:"XAUUSDT", nq:false, kind:"don", r7:true, tfMin:8, span:1e9, flatCol:"#4cff00",
    spec:{tf:"8 分", par:"Donchian 回看 350 小時・多空反轉・日線 200 日均線之上空單改做多", src:"Binance XAUUSDT（日線用 PAXG 日 K）"},
    sub:"同 E 的 8 分 K・突破 350 小時高點翻多、跌破低點翻空・PAXG 日線 200 日均線之上空單改做多・永遠在場",
    P:{lookH:350, exDiv:1, maLen:200, tfMin:8, gold:true}},
-  {k:"gold11d", pg:"long", title:"黃金", tf:"中長趨勢・F 甲", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
+  {k:"gold11d", pg:"gold", title:"黃金", tf:"中長趨勢・F 甲", sym:"PAXGUSDT", spot:true, allDay:true, goldExact:true,
    nq:false, kind:"don", tfMin:11, span:12000, needBars:14200, flatCol:"#4cff00", dailyLong:200,
    spec:{tf:"11 分", par:"Donchian 回看 350 小時・停損 8 ATR・空手時日線 200 日均線之上做多、之下放空", src:"Binance PAXG 現貨（24 小時）"},
    sub:"同 F 的 11 分 K 與進出・多單出場後若 PAXG 日線在 200 日均線之上就續做多、之下才放空・永遠在場",
    P:{lookH:350, mode:"long", stopAtr:8, atrLen:14, tfMin:11}},
   /* v1.9.0 觀察頁：通用趨勢反手＋日線 60 日均線只擋空單，跟 A／C／D 的資料源一致，並行觀察到 11/10 */
-  {k:"atr30", pg:"obs", title:"那斯達克", tf:"觀察・G", sym:"QQQUSDT", nq:true, kind:"atr", span:1e9,
+  {k:"atr30", pg:null, title:"那斯達克", tf:"觀察・G", sym:"QQQUSDT", nq:true, kind:"atr", span:1e9,
    spec:{tf:"30 秒", par:"ATR 反手 60/70・日線 60 日均線之上不做空", src:"Binance QQQ 合約逐筆合成"},
    sub:"Binance QQQ 合約 30 秒（同 A）・ATR 反手 60/70・日線 60 日均線之上不做空",
    P:{len:60, mult:70, regLen:60}},
-  {k:"atr1", pg:"obs", title:"那斯達克", tf:"觀察・H", sym:"xyz:XYZ100", src:"hl", nq:false, kind:"atr", span:2100,
+  {k:"atr1", pg:null, title:"那斯達克", tf:"觀察・H", sym:"xyz:XYZ100", src:"hl", nq:false, kind:"atr", span:2100,
    spec:{tf:"1 分", par:"ATR 反手 60/50・日線 60 日均線之上不做空", src:"Hyperliquid 1 分 K"},
    sub:"Hyperliquid 1 分 K（同 C）・ATR 反手 60/50・日線 60 日均線之上不做空",
    P:{len:60, mult:50, regLen:60}},
-  {k:"atr2", pg:"obs", title:"那斯達克", tf:"觀察・I", sym:"NQ=F", src:"yahoo", nq:false, kind:"atr", tfMin:2, span:1e9,
+  {k:"atr2", pg:null, title:"那斯達克", tf:"觀察・I", sym:"NQ=F", src:"yahoo", nq:false, kind:"atr", tfMin:2, span:1e9,
    spec:{tf:"2 分", par:"ATR 反手 60/70・日線 60 日均線之上不做空", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
    sub:"NQ 期貨單一月份合約 2 分（同 D，延遲約 10 分鐘）・ATR 反手 60/70・日線 60 日均線之上不做空",
    P:{len:60, mult:70, regLen:60}},
@@ -770,37 +777,33 @@ const PANELS = [
      那斯達克 555/23 +7.71%（唯一三個商品前後半都賺的參數）、微台 555/23 +6.64%、那斯達克 37/37 +7.76%（回落 1.32% 最平順）、
      恆生 555/25.5 +6.11%（勝率 65%、回落 0.96%，但只有 2.5 週 17 筆）。參數照 848 不改；那斯達克兩格用 B 格同一份 Gate 30 秒原生 K、
      微台用台指頁的 30 秒 K。恆生沒有免費 30 秒資料源，先放空格，等使用者決定接法。 */
-  {k:"o2nq", pg:"obs2", title:"那斯達克", tf:"觀察二・555/23", sym:"QQQ_USDT", src:"gtr", tfSec:30, nq:true, kind:"rf", span:1e9,
+  {k:"o2nq", pg:"short", title:"那斯達克", tf:"觀察二・555/23", sym:"QQQ_USDT", src:"gtr", tfSec:30, nq:true, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 23・多空反轉", src:"Gate QQQ 合約原生 30 秒 K"},
    sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 555・倍數 23（848 左中）",
    P:{per:555, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
-  {k:"o2tx", pg:"obs2", title:"台指期", tf:"觀察二・555/23", src:"tx", tfSec:30, nq:false, kind:"rf", span:1e9,
+  {k:"o2tx", pg:"tx", title:"台指期", tf:"觀察二・555/23", src:"tx", tfSec:30, nq:false, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 23・多空反轉", src:"台指期近月含夜盤：期交所盤後逐筆＋TradingView 即時"},
    sub:"台指期近月（含夜盤）30 秒 K・Range Filter 取樣 555・倍數 23・盤後檔＋TradingView 即時",
    P:{per:555, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
-  {k:"o2nq37", pg:"obs2", title:"那斯達克", tf:"觀察二・37/37", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
+  {k:"o2nq37", pg:"short", title:"那斯達克", tf:"觀察二・37/37", sym:"QQQ_USDT", src:"gate", nq:true, kind:"rf", span:1e9,
    spec:{tf:"30 秒", par:"Range Filter 取樣 37・倍數 37・多空反轉", src:"Gate QQQ 合約原生 30 秒 K"},
    sub:"Gate QQQ 合約 30 秒 K（同 B）・Range Filter 取樣 37・倍數 37（848 右下）",
    P:{per:37, mult:37, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.19.0：恆生沒有免費盤後逐筆（港交所逐筆是付費商品），改由 TradingView 小型恆生 30 秒圖掛「恆生傳送」腳本，
      警報每根 30 秒 K 收盤送到轉接站 /hsi（留 10 天），剛建警報時順便補 3,400 根舊 K 給暖機。帳號是港股延遲報價，晚約 15 分鐘。 */
-  {k:"o2hsi", pg:"obs2", title:"恆生", tf:"觀察二・555/25.5", src:"hsi", nq:false, kind:"rf", span:1e9,
-   spec:{tf:"30 秒", par:"Range Filter 取樣 555・倍數 25.5・多空反轉", src:"小型恆生期貨：TradingView 警報（延遲約 15 分鐘）"},
-   sub:"小型恆生期貨 30 秒 K・Range Filter 取樣 555・倍數 25.5（848 右中）・TradingView 警報轉送",
-   P:{per:555, mult:25.5, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
   /* v1.35.0 觀察三（使用者 2026-10-28 要求，TV 長樣本 62 組套七關＋評分選出的三組）：TradingView「期貨趨勢 RF 濾網」日線濾網 1。
      不自己算 RF：直接用乙 45 秒（y45）／甲 45 秒（j45）格的部位；前一個交易日連續月 NQ=F 收盤 ≥ N 日均線時不做空（空單改續抱多），
      其他時候照 RF 多空反手，永遠在場內。用連續月 DAILY（不是 D 甲乙丙的 DAILY7）：TV 回測的 MNQ1! 沒開「依合約變更調整」，849 三格也是。
      TV 45 秒 2022-09 起（1 口微型扣成本）：乙＋170 日 +112.7 萬／回撤 10.0、乙＋150 日 +106.6／13.1、甲＋150 日 +96.9／15.3，四段都賺。 */
-  {k:"y170", pg:"obs3", title:"那斯達克", tf:"觀察三・乙＋170日", sym:"QQQ_USDT", src:"bal", tfSec:45, nq:true, kind:"rfd", base:"y45", span:1e9,
+  {k:"y170", pg:"long", title:"那斯達克", tf:"觀察三・乙＋170日", sym:"QQQ_USDT", src:"bal", tfSec:45, nq:true, kind:"rfd", base:"y45", span:1e9,
    spec:{tf:"45 秒", par:"乙 Range Filter 576/27・日線在 170 日均線上不做空・永遠在場內", src:"乙 45 秒格的部位＋連續月 NQ 日線"},
    sub:"乙 45 秒（576/27）＋前一日 NQ 收盤在 170 日均線上不做空，其他時候多空反手（TV 849 右上）",
    P:{maLen:170}},
-  {k:"y150", pg:"obs3", title:"那斯達克", tf:"觀察三・乙＋150日", sym:"QQQ_USDT", src:"bal", tfSec:45, nq:true, kind:"rfd", base:"y45", span:1e9,
+  {k:"y150", pg:"long", title:"那斯達克", tf:"觀察三・乙＋150日", sym:"QQQ_USDT", src:"bal", tfSec:45, nq:true, kind:"rfd", base:"y45", span:1e9,
    spec:{tf:"45 秒", par:"乙 Range Filter 576/27・日線在 150 日均線上不做空・永遠在場內", src:"乙 45 秒格的部位＋連續月 NQ 日線"},
    sub:"乙 45 秒（576/27）＋前一日 NQ 收盤在 150 日均線上不做空，其他時候多空反手（TV 849 第 3 欄下）",
    P:{maLen:150}},
-  {k:"j150", pg:"obs3", title:"那斯達克", tf:"觀察三・甲＋150日", sym:"QQQ_USDT", src:"bal", tfSec:45, nq:true, kind:"rfd", base:"j45", span:1e9,
+  {k:"j150", pg:"long", title:"那斯達克", tf:"觀察三・甲＋150日", sym:"QQQ_USDT", src:"bal", tfSec:45, nq:true, kind:"rfd", base:"j45", span:1e9,
    spec:{tf:"45 秒", par:"甲 Range Filter 370/25.7・日線在 150 日均線上不做空・永遠在場內", src:"甲 45 秒格的部位＋連續月 NQ 日線"},
    sub:"甲 45 秒（370/25.7）＋前一日 NQ 收盤在 150 日均線上不做空，其他時候多空反手（TV 849 右下）",
    P:{maLen:150}},
@@ -1350,7 +1353,7 @@ function renderInfo(p){
   const flatCls = p.flatCol === COL[1] ? "long" : p.flatCol ? "short" : "";
   badge.className = "badge " + (e.side > 0 ? "long" : e.side < 0 ? "short" : flatCls);
   badge.textContent = e.side > 0 ? "持多" : e.side < 0 ? "持空" : "空手";
-  if(BOARD_AT[p.k]){ const sec = $("p-" + p.k); sec.classList.toggle("fr-long", e.side > 0); sec.classList.toggle("fr-short", e.side < 0); }   // v1.26.0 九格外框照部位閃爍
+  if(Object.values(DESK).some(d => d.keys.includes(p.k))){ const sec = $("p-" + p.k); sec.classList.toggle("fr-long", e.side > 0); sec.classList.toggle("fr-short", e.side < 0); }   // v1.26.0 九格外框照部位閃爍
   syncBlink();
   badge.innerHTML += totalHtml(p);
 
@@ -1462,7 +1465,6 @@ const TRADE_K = [
   {k:"TX4", pk:"o2tx", name:"觀察二 台指", unit:"點", self:true},   // v1.23.3 使用者要求明細不閃爍   // v1.17.0 觀察二的微台 30 秒 555/23
   {k:"O1", pk:"o2nq", name:"觀察二 那斯達克 555/23", unit:"點"},   // v1.23.4 紅字閃爍（取代原黃底閃爍）     // v1.19.0 紀錄程式 O1，10/6 起回算
   {k:"O2", pk:"o2nq37", name:"觀察二 那斯達克 37/37", unit:"點"},    // v1.19.0 紀錄程式 O2
-  {k:"HSI", pk:"o2hsi", name:"觀察二 恆生", unit:"點", self:"hsi"},  // v1.19.0 網頁自算（TradingView 警報資料暖機完成起）
   {k:"R30", pk:"atr30", name:"G",    unit:"點"},   // v1.9.0 觀察頁，紀錄 2026-10-14 起算
   {k:"R1",  pk:"atr1",  name:"H",    unit:"點"},
   {k:"R2",  pk:"atr2",  name:"I",    unit:"點"},
@@ -1857,11 +1859,15 @@ const LAY_KEY = "itd-layout", LAY_NEXT = {auto:"m", m:"w", w:"auto"}, LAY_TXT = 
    v1.29.0 使用者 2026-10-26 依商品分組重排（5 欄 × 3 列）：左 6 格那斯達克短趨勢、中上 4 格那斯達克中長趨勢、中下 2 格台指、
    右上 2 格黃金、右下 1 格恆生；每個小組外面一圈藍色閃爍框（GRP_AREAS，畫在格子間隙上）。 */
 // v1.34.0 使用者 2026-10-27 指定：第 1 縱列 甲 30／乙 45／平衡板，第 2 縱列 甲 45／B2／GA；觀察二 555/23 移到右下角
-const BOARD_AT = {j30:[1,1], y45:[2,1], bal:[3,1], j45:[1,2], gate2:[2,2], rf:[3,2], o2nq:[3,6],
-  nq6b:[1,3], nq7a:[1,4], nq7b:[2,3], nq7c:[2,4], tx37:[3,3], o2tx:[3,4], gold11:[1,5], gold11d:[1,6], gold8:[2,5], gold8d:[2,6], o2hsi:[3,5],
-  y170:[1,7], y150:[2,7], j150:[3,7]};   // v1.35.0 觀察三放第 7 欄
-// v1.30.0 改 6 欄：黃金小組右上 2×2（F、F 甲／E、E 甲），恆生仍在右下
-const GRP_AREAS = ["1 / 1 / 4 / 3", "1 / 3 / 3 / 5", "3 / 3 / 4 / 5", "1 / 5 / 3 / 7", "3 / 5 / 4 / 6", "1 / 7 / 4 / 8"];   // v1.35.0 第 7 欄觀察三   // 列起／欄起／列止／欄止
+/* v1.39.0（使用者 2026-10-29「電腦畫面分頁面」）：電腦版也照四個分頁切換（那斯達克短趨勢／中長趨勢／台指／黃金），
+   不再 21 格擠一頁、藍色分組框拿掉。每頁的格子順序與欄數寫在 DESK，列數照格數自動算。G／H／I、恆生不顯示。 */
+const DESK = {
+  short:{cols:5, keys:["rf", "j30", "y45", "bal", "gate2", "j45", "gate", "gate3", "o2nq", "o2nq37"]},
+  long: {cols:4, keys:["nq7a", "nq7b", "nq7c", "nq6", "y170", "y150", "j150", "nq6b"]},
+  tx:   {cols:2, keys:["tx30", "tx37", "tx22", "o2tx"]},
+  gold: {cols:2, keys:["gold11", "gold11d", "gold8", "gold8d"]},
+};
+const GRP_AREAS = [];
 function layMode(){ try{ return localStorage.getItem(LAY_KEY) || "auto"; }catch(e){ return "auto"; } }
 function applyLayout(){
   const mode = layMode(), wide = mode === "w" || (mode === "auto" && window.innerWidth >= 1280);
@@ -1872,13 +1878,13 @@ function applyLayout(){
 function showPage(pg){
   if(!PANELS.some(p => p.pg === pg)) pg = "short";
   /* v1.29.1：電腦版 15 格同一頁、不分頁，放大的格子不屬於記住的分頁也不能取消（之前只有短趨勢那幾格放得大） */
-  if(MAXK && !document.body.classList.contains("lay-w") && PAN(MAXK).pg !== pg){ MAXK = null; for(const p of PANELS){ const b = $("mx-" + p.k); b.textContent = "⤢"; b.title = "這一格放到最大"; } }
+  if(MAXK && PAN(MAXK).pg !== pg){ MAXK = null; for(const p of PANELS){ const b = $("mx-" + p.k); b.textContent = "⤢"; b.title = "這一格放到最大"; } }
   CURPG = pg;
   document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.pg === pg));
   /* 電腦版：不分頁，所有策略（觀察 G／H／I 除外）同時顯示；手機版照分頁。單格放大時只留那一格。 */
   const wide = document.body.classList.contains("lay-w");
   for(const p of PANELS){
-    const el = $("p-" + p.k), at = wide ? BOARD_AT[p.k] : null;
+    const el = $("p-" + p.k), D = DESK[pg], di = wide && D ? D.keys.indexOf(p.k) : -1, at = di >= 0 ? [Math.floor(di / D.cols) + 1, di % D.cols + 1] : null;
     const onPage = wide ? !!at : p.pg === pg;
     el.hidden = !onPage || (MAXK !== null && p.k !== MAXK);
     /* 電腦版：每格指定位置；單格放大時那一格改放在唯一的格子裡 */
@@ -1886,6 +1892,7 @@ function showPage(pg){
     el.style.gridColumn = at ? (MAXK !== null ? "1" : String(at[1])) : "";
   }
   $("grid").classList.toggle("mx", MAXK !== null);
+  if(DESK[pg]){ $("grid").style.setProperty("--dc", DESK[pg].cols); $("grid").style.setProperty("--dr", Math.ceil(DESK[pg].keys.length / DESK[pg].cols)); }
   /* v1.33.0 手機版一頁超過 6 格：2 欄 × 3 列一屏、左右滑動翻屏；v1.34.4 起超過 4 格就分屏、一屏 1 欄 × 4 列；
      v1.34.8 改一屏 2 欄 × 2 列：第 s 屏第 j 格 → 列 floor(j/2)+1、欄 2s + j%2 + 1（同 v1.33.0 的算法） */
   const vis = wide || MAXK !== null ? [] : PANELS.filter(p => !$("p-" + p.k).hidden).sort((a, b) => mobRank(a.k) - mobRank(b.k));
@@ -2065,7 +2072,7 @@ function setHoverT(t){
    只在使用者動過圖之後才同步；格子的 K 棒週期不同（30 秒、37 秒、6 分…），所以用時間對齊、不用根數。
    v1.29.1：那斯達克拆成秒級（只有 2～4 天資料）與 6 分（7/15 起約三個月）兩組，否則動一下短趨勢，中長趨勢就被壓成同一段兩三天、縮不回去。 */
 const SYNC_GROUP = {};
-for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","o2nq","o2nq37","j30","y45","j45","bal","y170","y150","j150"], nq6:["nq6","nq6b","nq7a","nq7b","nq7c"], tx:["tx30","tx37","tx22","o2tx"], hsi:["o2hsi"]}))
+for(const [g, keys] of Object.entries({nq:["rf","gate","gate2","gate3","o2nq","o2nq37","j30","y45","j45","bal","y170","y150","j150"], nq6:["nq6","nq6b","nq7a","nq7b","nq7c"], tx:["tx30","tx37","tx22","o2tx"]}))
   for(const k of keys) SYNC_GROUP[k] = g;
 function syncView(p){
   const g = SYNC_GROUP[p.k];
@@ -2624,7 +2631,7 @@ async function main(){
       loadHL(PAN("atr1")).catch(e => { $("wait-atr1").textContent = "Hyperliquid 載入失敗：" + e.message + "，請重新整理"; }),
       pollTXL().catch(() => {}),
       loadTXH().catch(() => {}),   // v1.23.1 台指 10/06 起的舊段（沒有檔就略過）
-      pollHSI().catch(e => { HSI.err = "恆生資料讀取失敗：" + e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }),   // v1.19.0   // 即時 K 拿不到時照舊只顯示盤後資料
+      // v1.39.0 恆生與 TradingView「恆生傳送」已刪除（使用者 2026-10-29），不再讀 /hsi   // v1.19.0   // 即時 K 拿不到時照舊只顯示盤後資料
       loadDaily().catch(e => { for(const k of ["atr30", "atr1", "atr2", "nq7a", "nq7b", "nq7c"]) $("wait-" + k).textContent = "日線濾網資料載入失敗：" + e.message + "，請重新整理"; }),
       loadDailyG().catch(e => { for(const k of ["gold8d", "gold11d"]) $("wait-" + k).textContent = "黃金日線載入失敗：" + e.message + "，請重新整理"; }),
     ]);
@@ -2645,7 +2652,7 @@ async function main(){
   setInterval(gtrSave, 60000);
   setInterval(() => { loadDaily().catch(() => {}); loadDailyG().catch(() => {}); }, 1800000);
   // v1.23.0 台指只用 TradingView 資料：不再讀期交所盤後檔、不再讀 848 交易清單
-  setInterval(() => { pollHSI().catch(e => { HSI.pollErr = e.message; const p = PAN("o2hsi"); if(p) p.dirty = true; }); }, 30000);   // v1.19.0 恆生
+  // v1.39.0 恆生輪詢已拿掉   // v1.19.0 恆生
   // v1.18.0：失敗時也重畫台指各格，資料一停警告才跳得出來
   setInterval(() => { pollTXL().catch(e => { TX.pollErr = e.message; PANELS.forEach(p => { if(p.src === "tx") p.dirty = true; }); }); }, 10000);
   mnqRate().catch(() => {}); setInterval(() => { mnqRate().catch(() => {}); }, 3600000);   // v1.13.0 匯率一天更新一次   // v1.12.0 台指即時 K（TradingView 約 15 秒送一批）
