@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>期貨趨勢 v1.37.0</title>
+<title>期貨趨勢 v1.38.0</title>
 <meta name="description" content="那斯達克 30 秒 Range Filter（Binance 與 Gate）、那斯達克 6 分、黃金 8 分與黃金 11 分 Donchian 的即時趨勢訊號">
 <meta name="theme-color" content="#0b0e14">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -113,13 +113,21 @@ h1 small{font-size:11px;color:#ff2d55;font-weight:400;margin-left:5px}
 .panel.fr-short{border:1px solid #39ff14;animation:frShort 2.4s ease-in-out infinite}
 /* v1.28.0：LINE 推播的那幾格（PANELS 標 push:true）在外框內側多一圈黃色細線閃爍，十二格裡一眼找得到（使用者 2026-10-25 要求）。
    換推播組時只要把 push:true 移到別格。只動透明度、不加光暈。 */
-@keyframes pushIn{0%,100%{opacity:1}50%{opacity:.15}}
 .panel.push{position:relative}
 /* v1.34.4 前三名浮水印：圖表區正中半透明大數字，不擋點擊 */
 .cw[data-rank]::after{content:attr(data-rank);position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;
   font-size:110px;font-weight:900;line-height:1;color:rgba(255,255,255,.13);pointer-events:none}
-.panel.push::after{content:"";position:absolute;inset:2px;border:2px solid #ffd400;border-radius:6px;pointer-events:none;
-  animation:pushIn 2.4s ease-in-out infinite}
+/* v1.38.0（使用者 2026-10-29）：推播框跟著警報走（目前警報只有 TradingView D 甲），由黃線閃爍改成彩虹霓虹走馬燈：
+   ::after 是一圈 3px 的彩虹環（conic 漸層用 mask 挖空中間），角度一直轉＝顏色繞著外框跑；外圍 3px 同色發光；
+   ::before 是正中一條白芯細線（螢光＝白芯外發光）。只在外框，不碰文字。 */
+@property --pushAng{syntax:"<angle>";inherits:false;initial-value:0deg}
+@keyframes pushRun{to{--pushAng:360deg}}
+.panel.push::after{content:"";position:absolute;inset:1px;border-radius:7px;padding:3px;pointer-events:none;z-index:4;
+  background:conic-gradient(from var(--pushAng),#ff1744,#ff9100,#ffea00,#39ff14,#00e5ff,#2979ff,#d500f9,#ff1744);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
+  filter:drop-shadow(0 0 3px rgba(255,255,255,.35));animation:pushRun 3s linear infinite}
+.panel.push::before{content:"";position:absolute;inset:2.5px;border:1px solid rgba(255,255,255,.85);border-radius:6px;pointer-events:none;z-index:5}
 /* v1.16.0：B2 與台指 A/B 是 2026-10-18 與 TradingView 版面 848 逐筆對齊確認過的兩格，
    商品名稱閃爍標示。只改透明度、不加光暈，字本身的清晰度不動。 */
 @keyframes blinkName{0%,100%{opacity:1}50%{opacity:.25}}
@@ -256,7 +264,7 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y;cursor:crosshair}
 
 <script>
 "use strict";
-const VERSION = "v1.37.0";   // v1.37.0：績效表分短週期、中長週期兩張各自排名（每週翻向 2 次以下歸中長，中長不看平倉筆數），獲利名次、篩選名次移到最前面（使用者 2026-10-29）。 v1.36.0：那斯達克績效改成每點 20 元台幣、單邊手續費 25 元（來回 50 元＝2.5 點，跟原本成本比例相同），不再乘匯率（使用者 2026-10-29）。 v1.35.1：LINE／Telegram 推播由 B2 改推 GA（37 秒 300/23），推播黃框移到 GA；B2 改由 TradingView 849 警報。 v1.35.0：新增觀察三（乙＋170 日、乙＋150 日、甲＋150 日：乙／甲 45 秒 RF，前一日連續月 NQ 收盤在 N 日均線上不做空），手機版「觀察三」分頁、電腦版第 7 欄。 v1.34.10：手機橫放拿掉 560 寬上限、滿版。 v1.34.9：浮水印由前三名加到前四名（1～4）。 v1.34.8：手機版一屏改 2 欄 × 2 列（仍是 4 格、照前四名排），原本 1 欄 × 4 列。 v1.34.7：LINE 推播回到 B2（使用者同晚說「改 用 B2」），推播黃框由平衡板移回 B2。 v1.34.6：LINE 推播改推平衡板（甲 30 秒＋乙 45 秒同向才持有，進多／進空／轉空手都推），推播黃框由 B2 移到平衡板。 v1.34.5：LINE 推播退回 B2（37 秒 450/23），推播黃框由乙移回 B2。 v1.34.4：手機版一屏改 1 欄 × 4 列放 4 格，每頁先放篩選前四名（照名次、名次變了自動重排），B2 不再整排；前三名圖表區加 1、2、3 浮水印。 v1.34.3：修 B2 格設定被註解吃掉（顯示 undefined、載不出來，手機版右欄被撐出畫面也是這個原因）。 v1.34.2：手機版短趨勢頁改排法（上 B2 整排、中 GA／甲30、下 乙45／甲乙同；甲45、短趨勢・B、B3 移到第 2 屏）。 v1.34.1：LINE 推播由 B2 改成乙（45 秒 576/27），推播黃框移到乙。 v1.34.0：新增平衡板（甲 30 秒與乙 45 秒同向才持有，紀錄代號 BAL）。 v1.33.1：手機翻屏改點底部「1」「2」按鈕（圖表會吃掉手指拖曳，滑不動）。 v1.33.0：手機版一頁超過 6 格改成 2 欄 × 3 列一屏、左右滑動翻屏（底下圓點標第幾屏）。 v1.32.0：績效表篩選加嚴格四關（拿掉最大一筆仍賺、前後段都賺、合計 ≥ 回落 2 倍、連虧 ≤ 7），前四名紅字照新篩選。 v1.31.3：觀察二 555/23（左中）改用 Gate 逐筆合成 30 秒（原生 30 秒只回溯約 3.5 天，畫面從 10/23 起、跟旁邊格對不起來；紀錄 O1 本來就用逐筆合成）。 v1.31.2：藍色分組框再改 1px，跟紅框同粗。v1.31.1：藍框由 3px 改 2px（使用者嫌太粗）。 v1.31.0：只有篩選前四名紅字閃爍，其餘黑底黃字不閃。 v1.30.0：中長趨勢加 E 甲、F 甲（E、F 加幣安 PAXG 日線 200 日偏多，永遠在場），明細與績效表加兩組（紀錄 EG／FG，7/15 起算），電腦版改 6 欄。v1.29.3：D 甲乙丙起算列改真正進場日（4/06、4/08），格子找不到進場訊號時改讀正式紀錄，跟交易明細一致。v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
+const VERSION = "v1.38.0";   // v1.38.0：推播框跟著警報走——由 GA 移到 D 甲（10/29 起警報只留 TradingView D 甲，GA 推播已停），黃線閃爍改成彩虹霓虹走馬燈（使用者 2026-10-29）。 v1.37.0：績效表分短週期、中長週期兩張各自排名（每週翻向 2 次以下歸中長，中長不看平倉筆數），獲利名次、篩選名次移到最前面（使用者 2026-10-29）。 v1.36.0：那斯達克績效改成每點 20 元台幣、單邊手續費 25 元（來回 50 元＝2.5 點，跟原本成本比例相同），不再乘匯率（使用者 2026-10-29）。 v1.35.1：LINE／Telegram 推播由 B2 改推 GA（37 秒 300/23），推播黃框移到 GA；B2 改由 TradingView 849 警報。 v1.35.0：新增觀察三（乙＋170 日、乙＋150 日、甲＋150 日：乙／甲 45 秒 RF，前一日連續月 NQ 收盤在 N 日均線上不做空），手機版「觀察三」分頁、電腦版第 7 欄。 v1.34.10：手機橫放拿掉 560 寬上限、滿版。 v1.34.9：浮水印由前三名加到前四名（1～4）。 v1.34.8：手機版一屏改 2 欄 × 2 列（仍是 4 格、照前四名排），原本 1 欄 × 4 列。 v1.34.7：LINE 推播回到 B2（使用者同晚說「改 用 B2」），推播黃框由平衡板移回 B2。 v1.34.6：LINE 推播改推平衡板（甲 30 秒＋乙 45 秒同向才持有，進多／進空／轉空手都推），推播黃框由 B2 移到平衡板。 v1.34.5：LINE 推播退回 B2（37 秒 450/23），推播黃框由乙移回 B2。 v1.34.4：手機版一屏改 1 欄 × 4 列放 4 格，每頁先放篩選前四名（照名次、名次變了自動重排），B2 不再整排；前三名圖表區加 1、2、3 浮水印。 v1.34.3：修 B2 格設定被註解吃掉（顯示 undefined、載不出來，手機版右欄被撐出畫面也是這個原因）。 v1.34.2：手機版短趨勢頁改排法（上 B2 整排、中 GA／甲30、下 乙45／甲乙同；甲45、短趨勢・B、B3 移到第 2 屏）。 v1.34.1：LINE 推播由 B2 改成乙（45 秒 576/27），推播黃框移到乙。 v1.34.0：新增平衡板（甲 30 秒與乙 45 秒同向才持有，紀錄代號 BAL）。 v1.33.1：手機翻屏改點底部「1」「2」按鈕（圖表會吃掉手指拖曳，滑不動）。 v1.33.0：手機版一頁超過 6 格改成 2 欄 × 3 列一屏、左右滑動翻屏（底下圓點標第幾屏）。 v1.32.0：績效表篩選加嚴格四關（拿掉最大一筆仍賺、前後段都賺、合計 ≥ 回落 2 倍、連虧 ≤ 7），前四名紅字照新篩選。 v1.31.3：觀察二 555/23（左中）改用 Gate 逐筆合成 30 秒（原生 30 秒只回溯約 3.5 天，畫面從 10/23 起、跟旁邊格對不起來；紀錄 O1 本來就用逐筆合成）。 v1.31.2：藍色分組框再改 1px，跟紅框同粗。v1.31.1：藍框由 3px 改 2px（使用者嫌太粗）。 v1.31.0：只有篩選前四名紅字閃爍，其餘黑底黃字不閃。 v1.30.0：中長趨勢加 E 甲、F 甲（E、F 加幣安 PAXG 日線 200 日偏多，永遠在場），明細與績效表加兩組（紀錄 EG／FG，7/15 起算），電腦版改 6 欄。v1.29.3：D 甲乙丙起算列改真正進場日（4/06、4/08），格子找不到進場訊號時改讀正式紀錄，跟交易明細一致。v1.29.2：D 甲乙丙日線改用單一月份合約（對齊 TV 換月調整，D 甲 10/23 翻空），起算持有改用 TV 真正進場價。v1.29.1：電腦版單格放大對中長趨勢、台指、黃金、觀察二失效（被分頁判斷取消）；那斯達克同步拆成秒級與 6 分兩組，短趨勢縮放不再把中長趨勢壓成兩三天。v1.29.0：中長趨勢加 D 甲／乙／丙（規則 7 出場線反手＋日線偏多，永遠在場內），明細與績效表加三組（紀錄代號 DA／DB／DC，7/15 起算），電腦版改 5 欄 × 3 列（第 5 欄）。v1.28.1：Gate 逐筆請求排隊限速＋失敗等 11 秒重試（撞到每 10 秒 200 次限額，GA、B2、B3、前三名載不出來）；網頁標題補成同版號。v1.28.0：LINE 推播的格子（目前只有那斯達克 B2；台指 A/B 使用者說先不設，PANELS 標 push:true）外框內側加黃色細線閃爍。v1.27.0：GA 優化前三名（甲 30 秒 555/31.9、乙 45 秒 576/27、甲 45 秒 370/25.7）加成三格，電腦版改 4 欄 × 3 列（第 4 欄），商品名稱白字閃爍；明細與績效表加三組（紀錄代號 J30、Y45、J45，10/6 起算）；Gate 逐筆多合成 30、45 秒。v1.26.2： v1.26.2：舊幣安 A 加回交易明細與績效表（只讀正式紀錄）。v1.26.1：閃爍由 1.2 秒放慢成 2.4 秒、外框暗時亮度 15%→35%（使用者嫌刺眼）。
 //    // v1.26.0：A 格改 Gate 逐筆合成 37 秒 300/23（候選①），明細與績效表的 A 改讀紀錄代號 GA；畫面名稱改叫 GA；電腦版九格外框照部位閃爍（持多螢光紅、持空螢光綠、空手無框），取代 v1.25.1 的固定藍框。所有閃爍同步。v1.25.1：圖表標題 A 改回黃字不閃爍；B2、觀察二 555/23、D2 外框螢光藍細線閃爍。v1.25.0：電腦版（同一份程式，寬 1280px 以上或手動選「電腦」）：指定 9 格同一頁三欄三列、一樣大、不捲動；同市場格子同步顯示範圍（那斯達克、台指、恆生）；表格線螢光藍；持多／持空後面放合計（已平倉＋浮動）。v1.24.0：v1.23.6：圖表標題的觀察二 37/37 也改紅字閃爍；v1.23.5：圖表標題的 A、B2、D2、觀察二 555/23 改紅字閃爍；v1.23.4：績效表與明細的 A、B2、D2、觀察二 555/23 改紅字閃爍（只動透明度，不加光暈）；v1.23.3：明細的台指 A/B、觀察二台指拿掉閃爍；v1.23.2：台指四組從 10/21 起重新記錄觀察；v1.23.1：台指 A/B、觀察二可讀 台指/tv_hist.json 補 10/06 起的舊段明細；v1.23.0：台指四格用網頁自己的策略（參數不變）、資料只用 TradingView 台指期（1 秒 K 合成各格週期），不再照抄 848、不再讀期交所；v1.22.1：台指 K 線不再等期交所盤後檔，沒有連續月 30 秒時改用 TradingView 1 秒 K 合成；v1.22.0：台指 K 線改讀 TradingView 連續月 30 秒（轉接站 /tw，收到 200 根起生效，之前照舊）；v1.21.0：台指四組的持倉、明細、績效表改照 TradingView 848（連續月）交易清單（台指/tv_signals.json）；v1.20.4：台指換月窗恢復只看盤後（TX_HOLD_ROLL＝true）；v1.20.3：台指換月窗改即時優先；v1.20.2：明細視窗標題「交易明細」→「明細」；v1.20.1：標題列「中長趨勢」→「趨勢」、「交易明細」→「明細」；v1.20.0：交易明細加「績效表」分頁
 const $ = id => document.getElementById(id);
 const FAPI = "https://fapi.binance.com/fapi/v1";
@@ -621,7 +629,7 @@ const PANELS = [
      多出來的全在 10/15 之後，同一段資料挑的會偏好看。紀錄代號 GA；舊幣安 A 的紀錄照樣更新、不刪。
      幣安 30 秒線仍要載入：那斯達克換算比例與觀察頁 G 格在用。 */
   /* v1.35.1：使用者 2026-10-29「TG 和 LINE 做趨勢版 GA 警報」，推播由 B2 改推 GA，黃框移到這格；B2 改由 TV 849 警報。 */
-  {k:"rf", push:true, pg:"short", title:"那斯達克", tf:"短趨勢・GA", sym:"QQQ_USDT", src:"gtr", tfSec:37, nq:true, kind:"rf", span:1e9,
+  {k:"rf", pg:"short", title:"那斯達克", tf:"短趨勢・GA", sym:"QQQ_USDT", src:"gtr", tfSec:37, nq:true, kind:"rf", span:1e9,
    spec:{tf:"37 秒", par:"Range Filter 取樣 300・倍數 23・多空反轉", src:"Gate QQQ 合約逐筆合成"},
    sub:"Gate QQQ 合約逐筆合成 37 秒 K・Range Filter 取樣 300・倍數 23",
    P:{per:300, mult:23, useAtr:true, atrLen:12, atrMult:1.5, useVol:true, volLen:20}},
@@ -706,7 +714,7 @@ const PANELS = [
    P:{lookH:200, mode:"long", stopAtr:6, atrLen:14, tfMin:6}},
   /* v1.29.0 D 甲／乙／丙：同 D 的資料（Yahoo NQ 單一月份 6 分），規則 7 出場線反手＋日線偏多、永遠在場內（calcDon7）。
      TV NQ1! 6 分 2008 起（1 口微型扣成本）：甲 +120.6 萬／回落 −28.8、乙 +99.7／−29.7、丙 +96.2／−29.0，四段都賺，獲利偏重 2022 以後。 */
-  {k:"nq7a", pg:"long", title:"那斯達克", tf:"中長趨勢・D 甲", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", r7:true, tfMin:6, span:1e9, flatCol:"#4cff00",
+  {k:"nq7a", push:true, pg:"long", title:"那斯達克", tf:"中長趨勢・D 甲", sym:"NQ=F", src:"yahoo", nq:false, kind:"don", r7:true, tfMin:6, span:1e9, flatCol:"#4cff00",
    spec:{tf:"6 分", par:"出場線反手 350 小時・出場線 140 小時・日線 150 日均線之上空單改做多", src:"NQ 期貨單一月份合約（Yahoo，延遲約 10 分鐘）"},
    sub:"NQ 期貨單一月份合約 6 分（同 D）・出場線反手：首次用 350 小時通道定方向，之後破 140 小時出場線反手・日線 150 日均線之上空單改做多・永遠在場內",
    P:{lookH:350, exDiv:2.5, maLen:150, tfMin:6}},
@@ -1327,7 +1335,7 @@ function totalHtml(p){
 }
 /* v1.26.0：所有閃爍（外框、紅字標題、明細按鈕、即時燈號，都是 2.4 秒；同日使用者嫌刺眼由 1.2 秒放慢、外框暗時留 35%）起點對齊同一個時間原點，畫面上一起亮一起暗（使用者 2026-10-24 要求）。
    動畫是各自加上樣式那一刻才起跑，不對齊就會錯開；每秒補一次，新出現的閃爍也會對齊。 */
-const BLINKS = new Set(["blink", "blinkName", "frLong", "frShort", "pushIn", "grpBlink"]);
+const BLINKS = new Set(["blink", "blinkName", "frLong", "frShort", "grpBlink"]);
 function syncBlink(){
   if(!document.getAnimations) return;
   for(const a of document.getAnimations()) if(BLINKS.has(a.animationName) && a.startTime !== 0) a.startTime = 0;
