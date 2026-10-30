@@ -452,6 +452,21 @@ def daily_nq():
     b = yahoo("NQ=F", "1d", "2y")
     return [trade_day(t + 12 * 3600000) for t, *_ in b], [x[4] for x in b]
 
+def daily_settle(sym, B):
+    """D 甲乙丙的日線（同網頁 DAILY7）：單一月份合約，收盤改用結算價（＝美東 16:00 價格），跟 TradingView「結算價當日線收盤」一致。
+    2026-10-30 v1.42.0：Yahoo 日線在當天收盤入檔前，收盤是空的，另外還會多一根時間戳＝現在的即時日線，拿到的是新盤的盤中價。
+    10/29 盤後急跌那天，網頁與紀錄拿 29,107（新盤盤中價）當 10/29 收盤，D 甲 10/30 06:00 翻空；TV 用結算價 29,566 續抱多。
+    做法：Yahoo 日線只留美東 00:00 那根正式的；6 分 K 有 15:54～16:00 那根的日子，一律用它的收盤蓋過去（6 分 K 含 1 小時 K 補的前段，約一年）。"""
+    out = {}
+    for t, o, h, l, c, v in yahoo(sym, "1d", "2y"):
+        _, hh, mm = et(t)
+        if hh == 0 and mm == 0: out[trade_day(t + 12 * 3600000)] = c
+    for b in B:
+        _, hh, mm = et(b[0])
+        if hh == 15 and mm >= 54: out[trade_day(b[0])] = b[4]
+    d = sorted(out)
+    return d, [out[x] for x in d]
+
 def daily_paxg():
     """幣安 PAXG 現貨日 K → (UTC 日期, 收盤)，同網頁 DAILYG（E 甲、F 甲）"""
     k = jget("https://data-api.binance.vision/api/v3/klines?symbol=PAXGUSDT&interval=1d&limit=1000")
@@ -756,7 +771,8 @@ if __name__ == "__main__":
     print("算 D 甲／乙／丙：出場線反手＋日線偏多（同 C 的 6 分 K）")
     # 2026-10-26 v1.29.2：日線改用跟 6 分 K 同一個單一月份合約（同網頁 DAILY7）。連續月 NQ=F 沒換月調整，均線比 TV 低約 370 點，
     # D 甲 10/23 TV 已翻空這裡還抱多；換成單一月份合約後 10/23 06:00 @29,136 翻空與 TV 一字不差
-    bd = yahoo(act[0], "1d", "2y"); DAILY7 = ([trade_day(t + 12 * 3600000) for t, *_ in bd], [x[4] for x in bd])
+    # 2026-10-30 v1.42.0：收盤再改成結算價（美東 16:00），不再吃到 Yahoo 未入檔時的盤中價，見 daily_settle
+    DAILY7 = daily_settle(act[0], BC)
     for k, lk, ma in (("DA", 350, 150), ("DB", 350, 200), ("DC", 450, 200)):
         posR7, wR7 = calc_r7(BC, lk, 6, 2.5, ma, DAILY7)
         added += update(k, BC, posR7, wR7, act[1]); LAST[k] = LAST["C"]
