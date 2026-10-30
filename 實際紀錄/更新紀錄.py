@@ -183,7 +183,10 @@ def bars_A(since):
             if not ch or ch[0]["T"] < since: last_id = ch[0]["a"] - 1 if ch else fid; break
     n = 0
     while True:
-        ch = jget(f"{FAPI}/aggTrades?symbol=QQQUSDT&fromId={last_id + 1}&limit=1000")
+        try: ch = jget(f"{FAPI}/aggTrades?symbol=QQQUSDT&fromId={last_id + 1}&limit=1000")
+        except urllib.error.HTTPError as e:  # 400 = 超過交易所 2 天查詢窗，缺口抓不到
+            if e.code != 400: raise
+            print("  警告：A 格缺一段逐筆（交易所只給最近 2 天、每日檔還沒發布），該段 30 秒線不完整"); break
         if not ch: break
         trades += [(x["T"], float(x["p"]), float(x["q"])) for x in ch]; last_id = ch[-1]["a"]; n += 1
         if len(ch) < 1000: break
