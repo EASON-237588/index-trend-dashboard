@@ -1,0 +1,74 @@
+//@version=6
+strategy("期貨趨勢 平衡板 849", overlay=true, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, initial_capital=100000, commission_type=strategy.commission.cash_per_contract, commission_value=2.5)
+perA = input.int(555, "甲 取樣週期（30 秒）", minval=1)
+multA = input.float(31.9, "甲 範圍倍數", minval=0.1, step=0.5)
+perB = input.int(576, "乙 取樣週期（45 秒）", minval=1)
+multB = input.float(27, "乙 範圍倍數", minval=0.1, step=0.5)
+useAtr = input.bool(true, "ATR 過濾")
+useVol = input.bool(true, "成交量過濾")
+grpName = input.string("平衡板（甲乙同向）", "組別名稱（會出現在警報訊息第二行）")
+srcA = hl2
+avrA = ta.ema(math.abs(srcA - srcA[1]), perA)
+smrA = ta.ema(avrA, perA * 2 - 1) * multA
+var float filtA = na
+pvA = nz(filtA)
+filtA := srcA > pvA ? (srcA - smrA < pvA ? pvA : srcA - smrA) : (srcA + smrA > pvA ? pvA : srcA + smrA)
+var int upA = 0
+var int dnA = 0
+upA := filtA > filtA[1] ? upA + 1 : filtA < filtA[1] ? 0 : upA
+dnA := filtA < filtA[1] ? dnA + 1 : filtA > filtA[1] ? 0 : dnA
+movedA = srcA != srcA[1]
+volOkA = not useVol or volume > ta.sma(volume, 20) * 0.8
+atrA = ta.atr(12)
+longA = srcA > filtA and movedA and upA > 0 and volOkA and (not useAtr or close > close - atrA * 1.5)
+shortA = srcA < filtA and movedA and dnA > 0 and volOkA and (not useAtr or close < close + atrA * 1.5)
+var int ciA = 0
+pciA = ciA
+ciA := longA ? 1 : shortA ? -1 : pciA
+var int curA = 0
+goA = bar_index >= 6 * perA
+curA := goA and longA and pciA == -1 ? 1 : goA and shortA and pciA == 1 ? -1 : curA
+srcB = hl2
+avrB = ta.ema(math.abs(srcB - srcB[1]), perB)
+smrB = ta.ema(avrB, perB * 2 - 1) * multB
+var float filtB = na
+pvB = nz(filtB)
+filtB := srcB > pvB ? (srcB - smrB < pvB ? pvB : srcB - smrB) : (srcB + smrB > pvB ? pvB : srcB + smrB)
+var int upB = 0
+var int dnB = 0
+upB := filtB > filtB[1] ? upB + 1 : filtB < filtB[1] ? 0 : upB
+dnB := filtB < filtB[1] ? dnB + 1 : filtB > filtB[1] ? 0 : dnB
+movedB = srcB != srcB[1]
+volOkB = not useVol or volume > ta.sma(volume, 20) * 0.8
+atrB = ta.atr(12)
+longB = srcB > filtB and movedB and upB > 0 and volOkB and (not useAtr or close > close - atrB * 1.5)
+shortB = srcB < filtB and movedB and dnB > 0 and volOkB and (not useAtr or close < close + atrB * 1.5)
+var int ciB = 0
+pciB = ciB
+ciB := longB ? 1 : shortB ? -1 : pciB
+var int curB = 0
+goB = bar_index >= 6 * perB
+curB := goB and longB and pciB == -1 ? 1 : goB and shortB and pciB == 1 ? -1 : curB
+posB = request.security(syminfo.tickerid, "45S", curB, lookahead=barmerge.lookahead_off)
+posBal = curA != 0 and curA == posB ? curA : 0
+balChg = posBal != nz(posBal[1])
+posCol = posBal > 0 ? color.new(#ff3b3b, 0) : posBal < 0 ? color.new(#4cff00, 0) : color.new(#7a8494, 0)
+plot(filtA, "平衡板濾網（甲）", color=posCol, linewidth=2)
+barcolor(posCol)
+var table infoTb = table.new(position.top_left, 2, 1)
+posN = strategy.position_size
+ep = strategy.opentrades > 0 ? strategy.opentrades.entry_price(strategy.opentrades - 1) : na
+et = strategy.opentrades > 0 ? strategy.opentrades.entry_time(strategy.opentrades - 1) : na
+pts = posN > 0 ? close - ep : posN < 0 ? ep - close : na
+infoTxt = posN == 0 ? "空手" : (posN > 0 ? "多 " : "空 ") + str.format_time(et, "MM/dd HH:mm", "Asia/Taipei") + " @" + str.tostring(ep, "#,##0.##") + "　浮動 " + str.tostring(pts, "+#,##0.##;-#,##0.##") + " 點 " + str.tostring(pts * 20, "+#,##0;-#,##0") + " 元"
+table.cell(infoTb, 0, 0, "", width = 20)
+table.cell(infoTb, 1, 0, infoTxt, text_color = color.white, text_size = size.normal, text_halign = text.align_left, text_formatting = text.format_none)
+alertMsg = (posBal > 0 ? "▲ 翻多" : posBal < 0 ? "▼ 翻空" : "■ 空手") + "\n" + grpName + "\n\n訊號時間　" + str.format_time(time, "MM-dd HH:mm", "Asia/Taipei") + "\n訊號價　　" + str.tostring(close, format.mintick)
+if balChg and posBal > 0
+    strategy.entry("多", strategy.long)
+if balChg and posBal < 0
+    strategy.entry("空", strategy.short)
+if balChg and posBal == 0
+    strategy.close_all()
+if balChg
+    alert(alertMsg, alert.freq_once_per_bar_close)
