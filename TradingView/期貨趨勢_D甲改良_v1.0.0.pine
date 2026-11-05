@@ -1,0 +1,41 @@
+// 期貨趨勢・D 甲改良 v1.0.0（2026-10-31 HP，使用者要求測「均線邊緣來回翻」與「跌很深還抱多」兩個弱點的改法）
+// 底稿＝D 甲（規則 7）：首次用回看通道定方向，之後多單跌破出場線翻空、空單突破出場線翻多；日線偏多時空單改做多。永遠在場內。
+// 三個改法（緩衝 0、確認 1、出場線優先 0 時與原版 D 甲一字不差，先用來對照）：
+// 緩衝 %：日線狀態要「收盤 < 均線 ×(1−緩衝)」才轉空頭、「收盤 ≥ 均線 ×(1＋緩衝)」才轉回多頭（遲滯帶，防邊緣來回翻）
+// 確認天數：要連續 N 天收在均線同一側才轉狀態
+// 出場線優先 %：只有收盤 ≥ 均線 ×(1＋這個數) 才擋空單；離均線較近時由出場線決定（防跌很深還抱多）
+// 掛 CME_MINI:NQ1! 6 分 K、依合約變更調整。日線取前一天已收完的值（[1]＋lookahead_on），不偷看；狀態每換一天更新一次。
+// 全檔只有最後一行有縮排（TradingView 編輯器貼多行縮排會疊加跑掉）。
+//@version=6
+strategy("期貨趨勢 D甲改良", overlay=true, process_orders_on_close=true, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, initial_capital=20000000, calc_on_every_tick=false, commission_type=strategy.commission.cash_per_contract, commission_value=25)
+lookH = input.int(350, "回看小時")
+dDiv = input.float(2.5, "出場線比例（回看÷這個數）")
+maLen = input.int(150, "日線均線（天）")
+hy = input.float(0, "緩衝 %", step=0.1, minval=0)
+cn = input.int(1, "確認天數", minval=1)
+far = input.float(0, "出場線優先 %（0＝關）", step=0.1, minval=0)
+look = math.min(4999, math.max(2, math.round(lookH * 60 / timeframe.multiplier)))
+exn = math.max(10, math.round(look / dDiv))
+hh = ta.highest(high, look)[1]
+ll = ta.lowest(low, look)[1]
+he = ta.highest(high, exn)[1]
+le = ta.lowest(low, exn)[1]
+var int r7 = 0
+r7 := na(hh) ? 0 : r7 == 0 ? (close > hh ? 1 : close < ll ? -1 : 0) : r7 == 1 ? (close < le ? -1 : 1) : (close > he ? 1 : -1)
+[dc, dma] = request.security(syminfo.tickerid, "D", [close[1], ta.sma(close, maLen)[1]], lookahead=barmerge.lookahead_on)
+newD = ta.change(time("D")) != 0
+var int ca = 0
+var int cb = 0
+var int st = 1
+ca := newD and not na(dma) ? (dc >= dma ? ca + 1 : 0) : ca
+cb := newD and not na(dma) ? (dc < dma ? cb + 1 : 0) : cb
+st := newD and not na(dma) ? (st == 1 and dc < dma * (1 - hy / 100) and cb >= cn ? -1 : st == -1 and dc >= dma * (1 + hy / 100) and ca >= cn ? 1 : st) : st
+strong = far <= 0 or dc >= dma * (1 + far / 100)
+dUp = not na(dma) and st == 1 and strong
+want = r7 == 1 or dUp ? 1 : r7 == -1 ? -1 : 0
+cur = strategy.position_size > 0 ? 1 : strategy.position_size < 0 ? -1 : 0
+posCol = cur > 0 ? color.new(#ff3b3b, 0) : cur < 0 ? color.new(#4cff00, 0) : color.new(#7a8494, 0)
+plot(r7 == 1 ? le : r7 == -1 ? he : na, "出場線", color=posCol, linewidth=2)
+plot(dma, "日線均線", color=color.new(#ffd400, 0), linewidth=1)
+if want != 0 and want != cur
+    strategy.entry(want > 0 ? "多" : "空", want > 0 ? strategy.long : strategy.short)
